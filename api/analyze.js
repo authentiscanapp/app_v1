@@ -42,7 +42,7 @@ export default async function handler(req, res) {
           blobUrl = blob.url;
 
           // STEP 1a: Submit detection job
-          const resembleRes = await fetch("https://app.resemble.ai/api/v2/deepfake_detection", {
+          const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${RESEMBLE_KEY}`,
@@ -67,7 +67,7 @@ export default async function handler(req, res) {
                 await new Promise(r => setTimeout(r, 2000));
                 attempts++;
 
-                const pollRes = await fetch(`https://app.resemble.ai/api/v2/deepfake_detection/${uuid}`, {
+                const pollRes = await fetch(`https://app.resemble.ai/api/v2/detect/${uuid}`, {
                   method: "GET",
                   headers: {
                     "Authorization": `Bearer ${RESEMBLE_KEY}`,
