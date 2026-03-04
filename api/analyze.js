@@ -41,72 +41,36 @@ export default async function handler(req, res) {
           );
           blobUrl = blob.url;
 
-          // STEP 1a: Submit detection job
+          // Submit detection — Prefer: wait = resposta síncrona imediata
           const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${RESEMBLE_KEY}`,
               "Content-Type": "application/json",
+              "Prefer": "wait",
             },
-            body: JSON.stringify({ url: blobUrl }),
+            body: JSON.stringify({
+              url: blobUrl,
+              privacy_mode: true,
+            }),
           });
+
+          // Delete blob after sending
+          try { await del(blobUrl); } catch (_) {}
 
           if (!resembleRes.ok) {
             const errData = await resembleRes.json().catch(() => ({}));
             resembleError = errData.message || errData.error || `Resemble error ${resembleRes.status}`;
-            console.error("Resemble submit error:", resembleRes.status, JSON.stringify(errData));
+            console.error("Resemble error:", resembleRes.status, JSON.stringify(errData));
           } else {
-            const submitData = await resembleRes.json();
-            const uuid = submitData?.item?.uuid;
-            console.log("Resemble submitted, uuid:", uuid);
-
-            if (uuid) {
-              // STEP 1b: Poll for result (max 10 attempts, 2s apart)
-              let attempts = 0;
-              while (attempts < 10) {
-                await new Promise(r => setTimeout(r, 2000));
-                attempts++;
-
-                const pollRes = await fetch(`https://app.resemble.ai/api/v2/detect/${uuid}`, {
-                  method: "GET",
-                  headers: {
-                    "Authorization": `Bearer ${RESEMBLE_KEY}`,
-                  },
-                });
-
-                if (pollRes.ok) {
-                  const pollData = await pollRes.json();
-                  const item = pollData?.item;
-                  console.log(`Resemble poll attempt ${attempts}:`, JSON.stringify(item?.status), JSON.stringify(item?.metrics));
-
-                  if (item?.status === "complete" || item?.status === "completed" || item?.status === "done") {
-                    const metrics = item.metrics || {};
-                    resembleScore = metrics.score ?? metrics.ai_score ?? metrics.ai_probability ?? metrics.probability ?? null;
-                    resembleLabel = metrics.label ?? (resembleScore > 0.5 ? "AI" : "HUMAN");
-                    console.log("Resemble final score:", resembleScore, "label:", resembleLabel);
-                    break;
-                  } else if (item?.status === "failed" || item?.status === "error") {
-                    resembleError = "Resemble detection failed";
-                    break;
-                  }
-                } else {
-                  console.error("Resemble poll error:", pollRes.status);
-                  break;
-                }
-              }
-
-              if (resembleScore === null && !resembleError) {
-                resembleError = "Resemble detection timed out";
-                console.error("Resemble timed out after 10 attempts");
-              }
-            } else {
-              resembleError = "No UUID returned from Resemble";
-            }
+            const rData = await resembleRes.json();
+            console.log("Resemble response:", JSON.stringify(rData));
+            const metrics = rData?.item?.metrics || {};
+            // aggregated_score é string ex: "0.80"
+            const rawScore = metrics.aggregated_score ?? metrics.score?.[0] ?? null;
+            resembleScore = rawScore !== null ? parseFloat(rawScore) : null;
+            resembleLabel = metrics.label || (resembleScore > 0.5 ? "fake" : "real");
           }
-
-          // Delete blob after detection
-          try { await del(blobUrl); } catch (_) {}
-
         } catch (e) {
           resembleError = e.message;
           if (blobUrl) { try { await del(blobUrl); } catch (_) {} }
@@ -144,10 +108,10 @@ export default async function handler(req, res) {
         }
       }
 
-      // ── STEP 3: Return result with Resemble data ──
+      // ── STEP 3: Retorna resultado com score do Resemble ──
       if (resembleScore !== null) {
         const aiPct = Math.round(resembleScore * 100);
-        const isAI = resembleLabel === "AI" || resembleScore > 0.5;
+        const isAI = resembleLabel === "fake" || resembleScore > 0.5;
         const type = aiPct >= 65 ? "danger" : aiPct >= 35 ? "warn" : "safe";
         const verdict = aiPct >= 65 ? "fake" : aiPct >= 35 ? "misleading" : "real";
 
@@ -167,14 +131,14 @@ export default async function handler(req, res) {
             {
               name: "Voice Origin",
               desc: isAI
-                ? `Acoustic analysis detected artificial synthesis patterns with ${aiPct}% probability.`
+                ? `Resemble DETECT-3B identified synthetic voice patterns with ${aiPct}% probability.`
                 : `Acoustic patterns consistent with natural human voice (${aiPct}% AI probability).`,
               pct: `${aiPct}%`,
               level: type,
             },
             {
               name: "Acoustic Analysis",
-              desc: `Resemble AI DETECT-3B analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} in the audio signal.`,
+              desc: `Resemble AI DETECT-3B analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} frame-by-frame.`,
               pct: `${aiPct}%`,
               level: type,
             },
@@ -200,7 +164,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // ── STEP 4: Fallback — use Claude on transcription ──
+      // ── STEP 4: Fallback — usa Claude na transcrição ──
       if (transcription && transcription.trim().length > 0) {
         const audioPrompt = `You are a fact-checker for AuthentiScan Pro. Analyze this audio transcription for misinformation. Return ONLY valid JSON:
 
@@ -250,7 +214,7 @@ Transcription: """${transcription.slice(0, 3000)}"""
         }
       }
 
-      // ── STEP 5: Final fallback ──
+      // ── STEP 5: Fallback final ──
       return res.status(200).json({
         type: "warn",
         score: 45,
