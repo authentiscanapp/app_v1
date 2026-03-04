@@ -33,7 +33,7 @@ export default async function handler(req, res) {
 
       if (RESEMBLE_KEY) {
         try {
-          // Upload to Vercel Blob to get a public URL
+          // Upload to Vercel Blob
           const blob = await put(
             `audio-scan-${Date.now()}.wav`,
             audioBuffer,
@@ -41,32 +41,72 @@ export default async function handler(req, res) {
           );
           blobUrl = blob.url;
 
-          // Send URL to Resemble Detect — correct endpoint + Bearer auth
-          const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
+          // STEP 1a: Submit detection job
+          const resembleRes = await fetch("https://app.resemble.ai/api/v2/deepfake_detection", {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${RESEMBLE_KEY}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              url: blobUrl,
-            }),
+            body: JSON.stringify({ url: blobUrl }),
           });
 
-          // Delete blob immediately after sending to Resemble
-          try { await del(blobUrl); } catch (_) {}
-
-          if (resembleRes.ok) {
-            const rData = await resembleRes.json();
-            console.log("Resemble response:", JSON.stringify(rData));
-            const item = rData.item || rData;
-            resembleScore = item.score ?? item.ai_score ?? item.ai_probability ?? null;
-            resembleLabel = item.label ?? (resembleScore > 0.5 ? "AI" : "HUMAN");
-          } else {
+          if (!resembleRes.ok) {
             const errData = await resembleRes.json().catch(() => ({}));
             resembleError = errData.message || errData.error || `Resemble error ${resembleRes.status}`;
-            console.error("Resemble Detect error:", resembleRes.status, JSON.stringify(errData));
+            console.error("Resemble submit error:", resembleRes.status, JSON.stringify(errData));
+          } else {
+            const submitData = await resembleRes.json();
+            const uuid = submitData?.item?.uuid;
+            console.log("Resemble submitted, uuid:", uuid);
+
+            if (uuid) {
+              // STEP 1b: Poll for result (max 10 attempts, 2s apart)
+              let attempts = 0;
+              while (attempts < 10) {
+                await new Promise(r => setTimeout(r, 2000));
+                attempts++;
+
+                const pollRes = await fetch(`https://app.resemble.ai/api/v2/deepfake_detection/${uuid}`, {
+                  method: "GET",
+                  headers: {
+                    "Authorization": `Bearer ${RESEMBLE_KEY}`,
+                  },
+                });
+
+                if (pollRes.ok) {
+                  const pollData = await pollRes.json();
+                  const item = pollData?.item;
+                  console.log(`Resemble poll attempt ${attempts}:`, JSON.stringify(item?.status), JSON.stringify(item?.metrics));
+
+                  if (item?.status === "complete" || item?.status === "completed" || item?.status === "done") {
+                    const metrics = item.metrics || {};
+                    resembleScore = metrics.score ?? metrics.ai_score ?? metrics.ai_probability ?? metrics.probability ?? null;
+                    resembleLabel = metrics.label ?? (resembleScore > 0.5 ? "AI" : "HUMAN");
+                    console.log("Resemble final score:", resembleScore, "label:", resembleLabel);
+                    break;
+                  } else if (item?.status === "failed" || item?.status === "error") {
+                    resembleError = "Resemble detection failed";
+                    break;
+                  }
+                } else {
+                  console.error("Resemble poll error:", pollRes.status);
+                  break;
+                }
+              }
+
+              if (resembleScore === null && !resembleError) {
+                resembleError = "Resemble detection timed out";
+                console.error("Resemble timed out after 10 attempts");
+              }
+            } else {
+              resembleError = "No UUID returned from Resemble";
+            }
           }
+
+          // Delete blob after detection
+          try { await del(blobUrl); } catch (_) {}
+
         } catch (e) {
           resembleError = e.message;
           if (blobUrl) { try { await del(blobUrl); } catch (_) {} }
@@ -117,7 +157,7 @@ export default async function handler(req, res) {
           verdict,
           title: isAI ? "AI-Generated Voice Detected" : "Voice Appears Authentic",
           desc: isAI
-            ? `Resemble Detect identified synthetic voice acoustic characteristics with ${aiPct}% confidence.`
+            ? `Resemble Detect identified synthetic voice characteristics with ${aiPct}% confidence.`
             : `Acoustic analysis found no significant evidence of artificial synthesis. ${100 - aiPct}% probability of being human.`,
           summary: isAI
             ? `Audio has high probability of being AI-generated (${aiPct}%).`
@@ -128,13 +168,13 @@ export default async function handler(req, res) {
               name: "Voice Origin",
               desc: isAI
                 ? `Acoustic analysis detected artificial synthesis patterns with ${aiPct}% probability.`
-                : `Acoustic patterns consistent with natural human voice. Low probability of synthesis (${aiPct}% AI).`,
+                : `Acoustic patterns consistent with natural human voice (${aiPct}% AI probability).`,
               pct: `${aiPct}%`,
               level: type,
             },
             {
               name: "Acoustic Analysis",
-              desc: `Resemble AI DETECT-3B model analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} in the audio signal.`,
+              desc: `Resemble AI DETECT-3B analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} in the audio signal.`,
               pct: `${aiPct}%`,
               level: type,
             },
@@ -160,7 +200,7 @@ export default async function handler(req, res) {
         });
       }
 
-      // ── STEP 4: Fallback — Resemble failed, use Claude on transcription ──
+      // ── STEP 4: Fallback — use Claude on transcription ──
       if (transcription && transcription.trim().length > 0) {
         const audioPrompt = `You are a fact-checker for AuthentiScan Pro. Analyze this audio transcription for misinformation. Return ONLY valid JSON:
 
