@@ -42,7 +42,7 @@ export default async function handler(req, res) {
           blobUrl = blob.url;
 
           // Send URL to Resemble Detect — correct endpoint + Bearer auth
-          const resembleRes = await fetch("https://app.resemble.ai/api/v2/deepfake_detection", {
+          const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
             method: "POST",
             headers: {
               "Authorization": `Bearer ${RESEMBLE_KEY}`,
