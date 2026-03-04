@@ -1285,7 +1285,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
     "Analyzing Patterns",
     "Generating Report",
   ];
-  const API_URL = "https://authentiscan-api.vercel.app/api/analyze";
+  const API_URL = "/api/analyze";
 
   const analyzeLocally = (input) => {
     const t = input.toLowerCase();
