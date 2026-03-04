@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     try {
       const audioBuffer = Buffer.from(audio, "base64");
 
-      // ── STEP 1: Resemble Detect — real acoustic AI voice analysis ──
+      // ── STEP 1: Resemble Detect ──
       let resembleScore = null;
       let resembleLabel = null;
       let resembleError = null;
@@ -41,17 +41,16 @@ export default async function handler(req, res) {
           );
           blobUrl = blob.url;
 
-          // Send URL to Resemble Detect
-          const formData = new FormData();
-          formData.append("url", blobUrl);
-          formData.append("privacy_mode", "true");
-
-          const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
+          // Send URL to Resemble Detect — correct endpoint + Bearer auth
+          const resembleRes = await fetch("https://app.resemble.ai/api/v2/deepfake_detection", {
             method: "POST",
             headers: {
-              Authorization: `Token ${RESEMBLE_KEY}`,
+              "Authorization": `Bearer ${RESEMBLE_KEY}`,
+              "Content-Type": "application/json",
             },
-            body: formData,
+            body: JSON.stringify({
+              url: blobUrl,
+            }),
           });
 
           // Delete blob immediately after sending to Resemble
@@ -59,18 +58,17 @@ export default async function handler(req, res) {
 
           if (resembleRes.ok) {
             const rData = await resembleRes.json();
-            // Resemble returns: { item: { score: 0.87, label: "AI", ... } }
+            console.log("Resemble response:", JSON.stringify(rData));
             const item = rData.item || rData;
             resembleScore = item.score ?? item.ai_score ?? item.ai_probability ?? null;
             resembleLabel = item.label ?? (resembleScore > 0.5 ? "AI" : "HUMAN");
           } else {
             const errData = await resembleRes.json().catch(() => ({}));
             resembleError = errData.message || errData.error || `Resemble error ${resembleRes.status}`;
-            console.error("Resemble Detect error:", resembleError);
+            console.error("Resemble Detect error:", resembleRes.status, JSON.stringify(errData));
           }
         } catch (e) {
           resembleError = e.message;
-          // Clean up blob if upload succeeded but detection failed
           if (blobUrl) { try { await del(blobUrl); } catch (_) {} }
           console.error("Resemble exception:", e.message);
         }
@@ -78,7 +76,7 @@ export default async function handler(req, res) {
         resembleError = "RESEMBLE_API_KEY not configured";
       }
 
-      // ── STEP 2: ElevenLabs STT — transcription ──
+      // ── STEP 2: ElevenLabs STT ──
       let transcription = null;
       let transcriptionError = null;
 
@@ -119,8 +117,8 @@ export default async function handler(req, res) {
           verdict,
           title: isAI ? "AI-Generated Voice Detected" : "Voice Appears Authentic",
           desc: isAI
-            ? `Resemble Detect identified synthetic voice acoustic characteristics with ${aiPct}% confidence. Frame-by-frame analysis revealed patterns associated with modern speech synthesis models.`
-            : `Acoustic analysis found no significant evidence of artificial synthesis. The voice presents natural characteristics with only ${aiPct}% probability of being AI-generated.`,
+            ? `Resemble Detect identified synthetic voice acoustic characteristics with ${aiPct}% confidence.`
+            : `Acoustic analysis found no significant evidence of artificial synthesis. ${100 - aiPct}% probability of being human.`,
           summary: isAI
             ? `Audio has high probability of being AI-generated (${aiPct}%).`
             : `Audio appears to be of human origin (${100 - aiPct}% human).`,
@@ -129,21 +127,21 @@ export default async function handler(req, res) {
             {
               name: "Voice Origin",
               desc: isAI
-                ? `Acoustic analysis detected artificial synthesis patterns with ${aiPct}% probability. Frequencies and cadences typical of AI-generated voice.`
-                : `Acoustic patterns consistent with natural human voice. Low probability of artificial synthesis (${aiPct}% AI).`,
+                ? `Acoustic analysis detected artificial synthesis patterns with ${aiPct}% probability.`
+                : `Acoustic patterns consistent with natural human voice. Low probability of synthesis (${aiPct}% AI).`,
               pct: `${aiPct}%`,
               level: type,
             },
             {
               name: "Acoustic Analysis",
-              desc: `Resemble AI DETECT-3B model analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} in the audio signal frame-by-frame.`,
+              desc: `Resemble AI DETECT-3B model analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} in the audio signal.`,
               pct: `${aiPct}%`,
               level: type,
             },
             {
               name: "Speech Transcription",
               desc: transcription
-                ? `"${transcription.slice(0, 120)}..."`
+                ? `"${transcription.slice(0, 120)}"`
                 : transcriptionError
                   ? `Transcription unavailable: ${transcriptionError}`
                   : "Add ELEVENLABS_API_KEY to enable transcription.",
@@ -153,7 +151,7 @@ export default async function handler(req, res) {
             {
               name: "Content Analysis",
               desc: transcription
-                ? "Transcription available. To verify spoken claims, copy the text and use text mode."
+                ? "Transcription available. Use text mode to verify spoken claims."
                 : "Acoustic analysis complete. Transcription required to verify spoken content.",
               pct: "N/A",
               level: "neutral",
