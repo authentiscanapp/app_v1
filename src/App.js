@@ -2275,7 +2275,7 @@ function ResultScreen({ result, go }) {
                   color: C.accent2,
                 }}
               >
-                Claude AI
+                AuthentiScan Analysis Engine
               </span>
             </div>
           )}
