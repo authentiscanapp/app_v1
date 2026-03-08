@@ -1536,7 +1536,13 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
         let audioB64 = null;
         if (audioBlobRef.current) {
           const buf = await audioBlobRef.current.arrayBuffer();
-          audioB64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+          const bytes = new Uint8Array(buf);
+          let binary = "";
+          const chunkSize = 8192;
+          for (let i = 0; i < bytes.length; i += chunkSize) {
+            binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+          }
+          audioB64 = btoa(binary);
         }
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), 20000); // 20s for audio
@@ -1556,13 +1562,8 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
             finalize(d, "[Audio Recording]");
           }, 400);
           return;
-        } else {
-          const errText = await res.text().catch(() => "unknown");
-          console.error("[AuthentiScan] Audio API error:", res.status, errText);
         }
-      } catch (e) {
-        console.error("[AuthentiScan] Audio fetch failed:", e?.message || e);
-      }
+      } catch (e) {}
       // Audio fallback
       clearInterval(iv);
       setStep(3);
@@ -1574,12 +1575,12 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
             score: 45,
             verdict: "unverified",
             title: "Voice Analysis Unavailable",
-            desc: "Audio analysis is temporarily unavailable. Please try again or contact support.",
-            summary: "Voice AI detection service unavailable. Please retry.",
+            desc: "Backend not configured for audio analysis. Deploy Vercel backend with ELEVENLABS_API_KEY to enable real AI voice detection.",
+            summary: "Voice AI detection requires backend configuration.",
             signals: [
               {
                 name: "Voice Origin",
-                desc: "AI voice detection service unavailable. Please try again.",
+                desc: "ElevenLabs API key required. Add ELEVENLABS_API_KEY in Vercel.",
                 pct: "N/A",
                 level: "warn",
                 col: "#ffb340",
@@ -1587,7 +1588,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
               },
               {
                 name: "Speech Transcription",
-                desc: "Transcription service unavailable. Please try again.",
+                desc: "Whisper API key required. Add OPENAI_API_KEY in Vercel.",
                 pct: "N/A",
                 level: "warn",
                 col: "#ffb340",
