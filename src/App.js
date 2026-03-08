@@ -1556,8 +1556,13 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
             finalize(d, "[Audio Recording]");
           }, 400);
           return;
+        } else {
+          const errText = await res.text().catch(() => "unknown");
+          console.error("[AuthentiScan] Audio API error:", res.status, errText);
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error("[AuthentiScan] Audio fetch failed:", e?.message || e);
+      }
       // Audio fallback
       clearInterval(iv);
       setStep(3);
@@ -1569,12 +1574,12 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
             score: 45,
             verdict: "unverified",
             title: "Voice Analysis Unavailable",
-            desc: "Backend not configured for audio analysis. Deploy Vercel backend with ELEVENLABS_API_KEY to enable real AI voice detection.",
-            summary: "Voice AI detection requires backend configuration.",
+            desc: "Audio analysis is temporarily unavailable. Please try again or contact support.",
+            summary: "Voice AI detection service unavailable. Please retry.",
             signals: [
               {
                 name: "Voice Origin",
-                desc: "ElevenLabs API key required. Add ELEVENLABS_API_KEY in Vercel.",
+                desc: "AI voice detection service unavailable. Please try again.",
                 pct: "N/A",
                 level: "warn",
                 col: "#ffb340",
@@ -1582,7 +1587,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
               },
               {
                 name: "Speech Transcription",
-                desc: "Whisper API key required. Add OPENAI_API_KEY in Vercel.",
+                desc: "Transcription service unavailable. Please try again.",
                 pct: "N/A",
                 level: "warn",
                 col: "#ffb340",
@@ -2275,7 +2280,7 @@ function ResultScreen({ result, go }) {
                   color: C.accent2,
                 }}
               >
-                AuthentiScan Analysis Engine
+                Claude AI
               </span>
             </div>
           )}
