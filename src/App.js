@@ -1273,6 +1273,8 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
   });
   const [step, setStep] = useState(-1);
   const [recording, setRecording] = useState(false);
+  const [recordingSecs, setRecordingSecs] = useState(0);
+  const recordingTimerRef = useRef(null);
   const [audioName, setAudioName] = useState("");
   const [scanError, setScanError] = useState("");
   const mediaRef = useRef(null);
@@ -1625,7 +1627,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: inputVal }),
+        body: JSON.stringify({ mode: inputType, text: inputVal }),
         signal: ctrl.signal,
       });
       clearTimeout(t);
@@ -1687,6 +1689,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
         mediaRef.current.stop();
         mediaRef.current.stream?.getTracks().forEach((t) => t.stop());
       }
+      clearInterval(recordingTimerRef.current);
       setRecording(false);
       return;
     }
@@ -1702,11 +1705,29 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
         const blob = new Blob(chunksRef.current, { type: "audio/webm" });
         audioBlobRef.current = blob;
         setAudioName(`Recording ready (${(blob.size / 1024).toFixed(1)}KB)`);
+        clearInterval(recordingTimerRef.current);
+        setRecordingSecs(0);
       };
       mediaRef.current = mr;
       mr.start(100);
       setRecording(true);
+      setRecordingSecs(0);
       setAudioName("");
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSecs((s) => {
+          if (s + 1 >= 120) {
+            // auto-stop at 2 min
+            if (mediaRef.current) {
+              mediaRef.current.stop();
+              mediaRef.current.stream?.getTracks().forEach((t) => t.stop());
+            }
+            clearInterval(recordingTimerRef.current);
+            setRecording(false);
+            return 0;
+          }
+          return s + 1;
+        });
+      }, 1000);
     } catch (e) {
       setAudioName("Mic access denied — using demo mode");
       setRecording(false);
@@ -2008,6 +2029,28 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
               >
                 {recording ? "● Recording — Tap to Stop" : "Tap to Record"}
               </span>
+              {recording && (
+                <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 13, color: C.danger, letterSpacing: 1 }}>
+                    {Math.floor(recordingSecs / 60).toString().padStart(2, "0")}:{(recordingSecs % 60).toString().padStart(2, "0")}
+                  </span>
+                  <div style={{ width: "100%", height: 4, background: "rgba(255,59,92,0.15)", borderRadius: 4, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.min((recordingSecs / 120) * 100, 100)}%`,
+                        background: C.danger,
+                        borderRadius: 4,
+                        transition: "width 1s linear",
+                        boxShadow: `0 0 8px ${C.danger}`,
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontFamily: "var(--mono)", fontSize: 8, color: "rgba(255,59,92,0.5)", letterSpacing: 1 }}>
+                    MAX 2:00
+                  </span>
+                </div>
+              )}
             </button>
             <button
               onClick={() => fileRef.current?.click()}
@@ -2202,7 +2245,8 @@ function ResultScreen({ result, go }) {
     const isSrc =
       s.name?.toLowerCase().includes("source") ||
       s.name?.toLowerCase().includes("credibility");
-    if (isSrc && !hasURL)
+    // Only force N/A if there's genuinely no URL AND the backend didn't already evaluate it
+    if (isSrc && !hasURL && (!s.pct || s.pct === "N/A"))
       return {
         ...s,
         desc: "No source URL provided — credibility not evaluated for this scan.",
@@ -2281,7 +2325,7 @@ function ResultScreen({ result, go }) {
                   color: C.accent2,
                 }}
               >
-                Claude AI
+                AuthentiScan Analysis Engine
               </span>
             </div>
           )}
@@ -2554,48 +2598,39 @@ function ResultScreen({ result, go }) {
               Composite Risk Index Methodology
             </div>
             <div style={{ marginBottom: 8 }}>
-              Weighted average of 4 signal categories:
+              Weighted average of {signals.length} signal categories:
             </div>
-            {[
-              [
-                "Claim Accuracy",
-                "35%",
-                "Verifies stated facts against known data",
-              ],
-              [
-                "Source Credibility",
-                "25%",
-                "Evaluates URL domain and citation quality",
-              ],
-              [
-                "Emotional Intensity",
-                "25%",
-                "Detects manipulation language patterns",
-              ],
-              [
-                "Context Completeness",
-                "15%",
-                "Checks for missing context or framing bias",
-              ],
-            ].map(([n, w, d]) => (
-              <div key={n} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
-                <span
-                  style={{
-                    color: C.accent,
-                    fontFamily: "var(--mono)",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    flexShrink: 0,
-                    minWidth: 30,
-                  }}
-                >
-                  {w}
-                </span>
-                <span>
-                  <span style={{ color: C.text }}>{n}</span> — {d}
-                </span>
-              </div>
-            ))}
+            {(() => {
+              // Build weights dynamically from actual signals
+              // Signals with N/A get half weight; others get full weight
+              const rawWeights = signals.map((s) =>
+                s.pct === "N/A" ? 0.5 : 1
+              );
+              const total = rawWeights.reduce((a, b) => a + b, 0);
+              return signals.map((sig, i) => {
+                const pct = Math.round((rawWeights[i] / total) * 100);
+                const desc = sig.desc || "Analyzed for this scan.";
+                return (
+                  <div key={i} style={{ display: "flex", gap: 8, marginBottom: 4 }}>
+                    <span
+                      style={{
+                        color: sig.pct === "N/A" ? C.muted : C.accent,
+                        fontFamily: "var(--mono)",
+                        fontSize: 10,
+                        fontWeight: 700,
+                        flexShrink: 0,
+                        minWidth: 30,
+                      }}
+                    >
+                      {pct}%
+                    </span>
+                    <span>
+                      <span style={{ color: C.text }}>{sig.name}</span> — {desc}
+                    </span>
+                  </div>
+                );
+              });
+            })()}
             <div
               style={{
                 marginTop: 10,
