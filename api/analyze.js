@@ -89,6 +89,7 @@ export default async function handler(req, res) {
           const elForm = new FormData();
           elForm.append("file", new Blob([audioBuffer], { type: "audio/wav" }), "audio.wav");
           elForm.append("model_id", "scribe_v1");
+          elForm.append("language_code", "auto");
 
           const elRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
             method: "POST",
