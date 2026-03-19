@@ -93,10 +93,7 @@ export default async function handler(req, res) {
           const elForm = new FormData();
           elForm.append("file", new Blob([audioBuffer], { type: "audio/wav" }), "audio.wav");
           elForm.append("model_id", "scribe_v1");
-          // FIX: força detecção automática de idioma sem assumir nenhum default
-          // Isso evita que o ElevenLabs interprete silêncio ou ruído como chinês
-          elForm.append("language_code", "");
-          elForm.append("diarize", "false");
+          // Sem language_code = auto-detect nativo do ElevenLabs
 
           const elRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
             method: "POST",
