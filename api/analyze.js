@@ -33,6 +33,7 @@ export default async function handler(req, res) {
 
       if (RESEMBLE_KEY) {
         try {
+          // Upload to Vercel Blob
           const blob = await put(
             `audio-scan-${Date.now()}.wav`,
             audioBuffer,
@@ -40,6 +41,7 @@ export default async function handler(req, res) {
           );
           blobUrl = blob.url;
 
+          // Submit detection — Prefer: wait = resposta síncrona imediata
           const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
             method: "POST",
             headers: {
@@ -53,6 +55,7 @@ export default async function handler(req, res) {
             }),
           });
 
+          // Delete blob after sending
           try { await del(blobUrl); } catch (_) {}
 
           if (!resembleRes.ok) {
@@ -63,17 +66,10 @@ export default async function handler(req, res) {
             const rData = await resembleRes.json();
             console.log("Resemble response:", JSON.stringify(rData));
             const metrics = rData?.item?.metrics || {};
-
-            // FIX: aggregated_score é probabilidade de ser HUMANO (0=AI, 1=human)
-            // Precisamos inverter: aiProbability = 1 - humanProbability
+            // aggregated_score é string ex: "0.80"
             const rawScore = metrics.aggregated_score ?? metrics.score?.[0] ?? null;
-            if (rawScore !== null) {
-              const humanProbability = parseFloat(rawScore);
-              // aiProbability é o oposto da probabilidade humana
-              const aiProbability = 1 - humanProbability;
-              resembleScore = Math.max(0, Math.min(1, aiProbability)); // clamp 0-1
-              resembleLabel = aiProbability > 0.5 ? "fake" : "real";
-            }
+            resembleScore = rawScore !== null ? parseFloat(rawScore) : null;
+            resembleLabel = metrics.label || (resembleScore > 0.5 ? "fake" : "real");
           }
         } catch (e) {
           resembleError = e.message;
@@ -93,7 +89,6 @@ export default async function handler(req, res) {
           const elForm = new FormData();
           elForm.append("file", new Blob([audioBuffer], { type: "audio/wav" }), "audio.wav");
           elForm.append("model_id", "scribe_v1");
-          // Sem language_code = auto-detect nativo do ElevenLabs
 
           const elRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
             method: "POST",
@@ -103,20 +98,7 @@ export default async function handler(req, res) {
 
           if (elRes.ok) {
             const elData = await elRes.json();
-            const rawTranscription = elData.text || elData.transcription || null;
-
-            // FIX: filtra transcrições inválidas (muito curtas, só ruído, ou não-latinas)
-            if (rawTranscription && rawTranscription.trim().length > 2) {
-              // Verifica se tem pelo menos algum caractere latino/número
-              // Se for só caracteres CJK (chinês/japonês/coreano), descarta
-              const hasCJK = /[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/.test(rawTranscription);
-              const hasLatin = /[a-zA-ZÀ-ÿ0-9]/.test(rawTranscription);
-              if (!hasCJK || hasLatin) {
-                transcription = rawTranscription;
-              } else {
-                transcriptionError = "Audio language could not be determined — likely noise or silence";
-              }
-            }
+            transcription = elData.text || elData.transcription || null;
           } else {
             const errData = await elRes.json().catch(() => ({}));
             transcriptionError = errData.detail?.message || `ElevenLabs error ${elRes.status}`;
@@ -128,10 +110,8 @@ export default async function handler(req, res) {
 
       // ── STEP 3: Retorna resultado com score do Resemble ──
       if (resembleScore !== null) {
-        // FIX: aiPct agora é corretamente 0-100 (0=humano, 100=AI)
-        const aiPct = Math.round(resembleScore * 100); // já está clampado 0-1
-        const humanPct = 100 - aiPct;
-        const isAI = resembleLabel === "fake";
+        const aiPct = Math.round(resembleScore * 100);
+        const isAI = resembleLabel === "fake" || resembleScore > 0.5;
         const type = aiPct >= 65 ? "danger" : aiPct >= 35 ? "warn" : "safe";
         const verdict = aiPct >= 65 ? "fake" : aiPct >= 35 ? "misleading" : "real";
 
@@ -141,30 +121,26 @@ export default async function handler(req, res) {
           verdict,
           title: isAI ? "AI-Generated Voice Detected" : "Voice Appears Authentic",
           desc: isAI
-            ? `Resemble Detect identified synthetic voice characteristics with ${aiPct}% AI probability.`
-            : `Acoustic analysis found no significant evidence of artificial synthesis. ${humanPct}% probability of being human.`,
+            ? `Resemble Detect identified synthetic voice characteristics with ${aiPct}% confidence.`
+            : `Acoustic analysis found no significant evidence of artificial synthesis. ${100 - aiPct}% probability of being human.`,
           summary: isAI
-            ? `Audio has high probability of being AI-generated (${aiPct}% AI).`
-            : `Audio appears to be of human origin (${humanPct}% human).`,
+            ? `Audio has high probability of being AI-generated (${aiPct}%).`
+            : `Audio appears to be of human origin (${100 - aiPct}% human).`,
           transcription: transcription ? transcription.slice(0, 300) : null,
           signals: [
             {
               name: "Voice Origin",
               desc: isAI
-                ? `Resemble DETECT-3B identified synthetic voice patterns with ${aiPct}% AI probability.`
-                : `Acoustic patterns consistent with natural human voice (${humanPct}% human probability).`,
+                ? `Resemble DETECT-3B identified synthetic voice patterns with ${aiPct}% probability.`
+                : `Acoustic patterns consistent with natural human voice (${aiPct}% AI probability).`,
               pct: `${aiPct}%`,
               level: type,
-              col: type === "safe" ? "#00e676" : type === "warn" ? "#ffb340" : "#ff3b5c",
-              dot: type === "safe" ? "#00e676" : type === "warn" ? "#ffb340" : "#ff3b5c",
             },
             {
               name: "Acoustic Analysis",
               desc: `Resemble AI DETECT-3B analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} frame-by-frame.`,
               pct: `${aiPct}%`,
               level: type,
-              col: type === "safe" ? "#00e676" : type === "warn" ? "#ffb340" : "#ff3b5c",
-              dot: type === "safe" ? "#00e676" : type === "warn" ? "#ffb340" : "#ff3b5c",
             },
             {
               name: "Speech Transcription",
@@ -175,8 +151,6 @@ export default async function handler(req, res) {
                   : "Add ELEVENLABS_API_KEY to enable transcription.",
               pct: transcription ? "OK" : "N/A",
               level: transcription ? "safe" : "neutral",
-              col: transcription ? "#00e676" : "#5a6475",
-              dot: transcription ? "#00e676" : "#5a6475",
             },
             {
               name: "Content Analysis",
@@ -185,8 +159,6 @@ export default async function handler(req, res) {
                 : "Acoustic analysis complete. Transcription required to verify spoken content.",
               pct: "N/A",
               level: "neutral",
-              col: "#5a6475",
-              dot: "#5a6475",
             },
           ],
         });
@@ -206,10 +178,10 @@ Transcription: """${transcription.slice(0, 3000)}"""
   "verdict": "unverified",
   "summary": "One sentence conclusion.",
   "signals": [
-    {"name": "Voice Origin", "desc": "Acoustic analysis unavailable — RESEMBLE_API_KEY required", "pct": "N/A", "level": "warn", "col": "#ffb340", "dot": "#ffb340"},
-    {"name": "Speech Transcription", "desc": "transcription excerpt here", "pct": "OK", "level": "safe", "col": "#00e676", "dot": "#00e676"},
-    {"name": "Audio Integrity", "desc": "coherence evaluation", "pct": "50%", "level": "warn", "col": "#ffb340", "dot": "#ffb340"},
-    {"name": "Content Analysis", "desc": "analysis of claims made", "pct": "60%", "level": "warn", "col": "#ffb340", "dot": "#ffb340"}
+    {"name": "Voice Origin", "desc": "Acoustic analysis unavailable — RESEMBLE_API_KEY required", "pct": "N/A", "level": "warn"},
+    {"name": "Speech Transcription", "desc": "transcription excerpt here", "pct": "OK", "level": "safe"},
+    {"name": "Audio Integrity", "desc": "coherence evaluation", "pct": "50%", "level": "warn"},
+    {"name": "Content Analysis", "desc": "analysis of claims made", "pct": "60%", "level": "warn"}
   ]
 }`;
 
@@ -253,10 +225,10 @@ Transcription: """${transcription.slice(0, 3000)}"""
           : `Detection failed: ${resembleError || "Unknown error"}`,
         summary: "Configure environment variables for complete analysis.",
         signals: [
-          { name: "Voice Origin", desc: RESEMBLE_KEY ? (resembleError || "Error") : "RESEMBLE_API_KEY required.", pct: "N/A", level: "warn", col: "#ffb340", dot: "#ffb340" },
-          { name: "Acoustic Analysis", desc: "Requires Resemble Detect API + Vercel Blob.", pct: "N/A", level: "warn", col: "#ffb340", dot: "#ffb340" },
-          { name: "Speech Transcription", desc: ELEVENLABS_KEY ? (transcriptionError || "No speech detected") : "ELEVENLABS_API_KEY required.", pct: "N/A", level: "warn", col: "#ffb340", dot: "#ffb340" },
-          { name: "Content Analysis", desc: "Transcription required.", pct: "N/A", level: "warn", col: "#5a6475", dot: "#5a6475" },
+          { name: "Voice Origin", desc: RESEMBLE_KEY ? (resembleError || "Error") : "RESEMBLE_API_KEY required.", pct: "N/A", level: "warn" },
+          { name: "Acoustic Analysis", desc: "Requires Resemble Detect API + Vercel Blob.", pct: "N/A", level: "warn" },
+          { name: "Speech Transcription", desc: ELEVENLABS_KEY ? (transcriptionError || "No speech detected") : "ELEVENLABS_API_KEY required.", pct: "N/A", level: "warn" },
+          { name: "Content Analysis", desc: "Transcription required.", pct: "N/A", level: "warn" },
         ],
       });
 
@@ -285,10 +257,10 @@ Return exactly this JSON structure:
   "verdict": "fake",
   "summary": "One sentence key finding.",
   "signals": [
-    {"name": "Claim Accuracy", "desc": "specific finding about claims", "pct": "15%", "level": "danger", "col": "#ff3b5c", "dot": "#ff3b5c"},
-    {"name": "Source Credibility", "desc": "source analysis or N/A if no URL", "pct": "N/A", "level": "neutral", "col": "#5a6475", "dot": "#5a6475"},
-    {"name": "Emotional Intensity", "desc": "language tone analysis", "pct": "20%", "level": "danger", "col": "#ff3b5c", "dot": "#ff3b5c"},
-    {"name": "Context Completeness", "desc": "context analysis", "pct": "25%", "level": "warn", "col": "#ffb340", "dot": "#ffb340"}
+    {"name": "Claim Accuracy", "desc": "specific finding about claims", "pct": "15%", "level": "danger"},
+    {"name": "Source Credibility", "desc": "source analysis or N/A if no URL", "pct": "N/A", "level": "neutral"},
+    {"name": "Emotional Intensity", "desc": "language tone analysis", "pct": "20%", "level": "danger"},
+    {"name": "Context Completeness", "desc": "context analysis", "pct": "25%", "level": "warn"}
   ]
 }
 
@@ -297,8 +269,7 @@ Rules:
 - verdict: "fake", "misleading", "real", or "unverified"
 - Source Credibility pct MUST be "N/A" if no URL in content
 - Be specific about actual claims in the content
-- Use web search to verify facts when possible
-- col and dot MUST match level: danger="#ff3b5c", warn="#ffb340", safe="#00e676", neutral="#5a6475"`;
+- Use web search to verify facts when possible`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
