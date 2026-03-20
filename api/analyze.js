@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
 
-  const { text, audio, mode } = req.body || {};
+  const { text, audio, mode, audioMime, audioExt } = req.body || {};
 
   // ══════════════════════════════════════
   // AUDIO MODE
@@ -24,6 +24,10 @@ export default async function handler(req, res) {
   if (mode === "audio" && audio) {
     try {
       const audioBuffer = Buffer.from(audio, "base64");
+
+      // Detect mime/ext from client or fallback to wav
+      const mime = audioMime || "audio/wav";
+      const ext = audioExt || "wav";
 
       // ── STEP 1: Resemble Detect ──
       let resembleScore = null;
@@ -33,15 +37,13 @@ export default async function handler(req, res) {
 
       if (RESEMBLE_KEY) {
         try {
-          // Upload to Vercel Blob
           const blob = await put(
-            `audio-scan-${Date.now()}.wav`,
+            `audio-scan-${Date.now()}.${ext}`,
             audioBuffer,
-            { access: "public", contentType: "audio/wav" }
+            { access: "public", contentType: mime }
           );
           blobUrl = blob.url;
 
-          // Submit detection — Prefer: wait = resposta síncrona imediata
           const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
             method: "POST",
             headers: {
@@ -49,12 +51,9 @@ export default async function handler(req, res) {
               "Content-Type": "application/json",
               "Prefer": "wait",
             },
-            body: JSON.stringify({
-              url: blobUrl,
-            }),
+            body: JSON.stringify({ url: blobUrl }),
           });
 
-          // Delete blob after sending
           try { await del(blobUrl); } catch (_) {}
 
           if (!resembleRes.ok) {
@@ -65,9 +64,7 @@ export default async function handler(req, res) {
             const rData = await resembleRes.json();
             console.log("Resemble response:", JSON.stringify(rData));
             const metrics = rData?.item?.metrics || {};
-            // aggregated_score é string ex: "0.80"
             const rawScore = metrics.aggregated_score ?? metrics.score?.[0] ?? null;
-            // FIX: clamp between 0 and 1 to prevent negative or >100% scores
             resembleScore = rawScore !== null ? Math.min(1, Math.max(0, parseFloat(rawScore))) : null;
             resembleLabel = metrics.label || (resembleScore > 0.5 ? "fake" : "real");
           }
@@ -87,7 +84,7 @@ export default async function handler(req, res) {
       if (ELEVENLABS_KEY) {
         try {
           const elForm = new FormData();
-          elForm.append("file", new Blob([audioBuffer], { type: "audio/wav" }), "audio.wav");
+          elForm.append("file", new Blob([audioBuffer], { type: mime }), `audio.${ext}`);
           elForm.append("model_id", "scribe_v1");
 
           const elRes = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
