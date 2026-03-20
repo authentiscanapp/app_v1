@@ -240,16 +240,11 @@ Transcription: """${transcription.slice(0, 3000)}"""
     return res.status(400).json({ error: "No content provided" });
   }
 
-  // Detect if content contains a URL
-  const hasUrl = true; // always search
+  const systemPrompt = `You are an expert fact-checker for AuthentiScan Pro. You ALWAYS use web_search before making any assessment. This is mandatory — never skip it. Search for the domain reputation, credibility, and any known issues before evaluating. Your score must reflect what you actually find via web search, never guess.`;
 
-  const prompt = `You are an expert fact-checker for AuthentiScan Pro. Your job is to analyze content for misinformation, scams, and credibility risks.
-
-${hasUrl ? `IMPORTANT: This content contains a URL or domain. You MUST use web_search to research this domain/URL before making any assessment. Search for: the domain reputation, whether it is a known fake news site, scam site, or impersonator domain. Do NOT skip the web search step.` : ""}
+  const prompt = `Analyze this content for misinformation, scams, and credibility risks. Use web_search first, then return ONLY valid JSON (no markdown, no explanation outside JSON):
 
 Content: """${text.slice(0, 3000)}"""
-
-After researching (if URL present), return ONLY valid JSON (no markdown, no explanation outside JSON):
 
 {
   "type": "danger",
@@ -270,8 +265,8 @@ Rules:
 - type: "danger" if score 65-100, "warn" if 35-64, "safe" if 0-34
 - verdict: "fake", "misleading", "real", or "unverified"
 - Source Credibility pct MUST be "N/A" if no URL in content
-- Be specific — mention the actual domain name and what you found about it`;
-- Score must reflect what you actually found via web search — do not guess
+- Be specific — mention the actual domain name and what you found about it
+- Score must reflect what you actually found via web search — do not guess`;
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -285,6 +280,7 @@ Rules:
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
         max_tokens: 2000,
+        system: systemPrompt,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }],
       }),
