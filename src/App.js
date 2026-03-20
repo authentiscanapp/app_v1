@@ -1551,7 +1551,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
         const res = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "audio", audio: audioB64 }),
+          body: JSON.stringify({ mode: "audio", audio: audioB64, audioMime: audioBlobRef.current?._mime || "audio/wav", audioExt: audioBlobRef.current?._ext || "wav" }),
           signal: ctrl.signal,
         });
         clearTimeout(t);
@@ -1737,6 +1737,8 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
     const f = e.target.files[0];
     if (f) {
       audioBlobRef.current = f;
+      audioBlobRef.current._mime = f.type || "audio/wav";
+      audioBlobRef.current._ext = f.name.split(".").pop() || "wav";
       setAudioName(f.name);
     }
   };
