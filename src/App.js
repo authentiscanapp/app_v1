@@ -1735,7 +1735,10 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
   };
   const handleFileUpload = (e) => {
     const f = e.target.files[0];
-    if (f) setAudioName(f.name);
+    if (f) {
+      audioBlobRef.current = f;
+      setAudioName(f.name);
+    }
   };
 
   /* analyzing overlay */
