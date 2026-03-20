@@ -68,7 +68,8 @@ export default async function handler(req, res) {
             const metrics = rData?.item?.metrics || {};
             // aggregated_score é string ex: "0.80"
             const rawScore = metrics.aggregated_score ?? metrics.score?.[0] ?? null;
-            resembleScore = rawScore !== null ? parseFloat(rawScore) : null;
+            // FIX: clamp between 0 and 1 to prevent negative or >100% scores
+            resembleScore = rawScore !== null ? Math.min(1, Math.max(0, parseFloat(rawScore))) : null;
             resembleLabel = metrics.label || (resembleScore > 0.5 ? "fake" : "real");
           }
         } catch (e) {
