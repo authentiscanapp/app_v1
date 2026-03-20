@@ -25,7 +25,6 @@ export default async function handler(req, res) {
     try {
       const audioBuffer = Buffer.from(audio, "base64");
 
-      // Detect mime/ext from client or fallback to wav
       const mime = audioMime || "audio/wav";
       const ext = audioExt || "wav";
 
@@ -241,21 +240,27 @@ Transcription: """${transcription.slice(0, 3000)}"""
     return res.status(400).json({ error: "No content provided" });
   }
 
-  const prompt = `You are an expert fact-checker for AuthentiScan Pro. Analyze this content and return ONLY valid JSON (no markdown, no explanation outside JSON):
+  // Detect if content contains a URL
+  const hasUrl = /https?:\/\/\S+|www\.\S+|\S+\.(com|co|net|org|info|biz|io)\b/.test(text);
+
+  const prompt = `You are an expert fact-checker for AuthentiScan Pro. Your job is to analyze content for misinformation, scams, and credibility risks.
+
+${hasUrl ? `IMPORTANT: This content contains a URL or domain. You MUST use web_search to research this domain/URL before making any assessment. Search for: the domain reputation, whether it is a known fake news site, scam site, or impersonator domain. Do NOT skip the web search step.` : ""}
 
 Content: """${text.slice(0, 3000)}"""
 
-Return exactly this JSON structure:
+After researching (if URL present), return ONLY valid JSON (no markdown, no explanation outside JSON):
+
 {
   "type": "danger",
   "score": 87,
   "title": "High Misinformation Risk",
-  "desc": "2-3 sentence analysis of why this content is risky or credible.",
+  "desc": "2-3 sentence analysis based on what you found. If a URL, explain what the domain is and why it is risky or credible.",
   "verdict": "fake",
   "summary": "One sentence key finding.",
   "signals": [
     {"name": "Claim Accuracy", "desc": "specific finding about claims", "pct": "15%", "level": "danger"},
-    {"name": "Source Credibility", "desc": "source analysis or N/A if no URL", "pct": "N/A", "level": "neutral"},
+    {"name": "Source Credibility", "desc": "what you found about this domain/source", "pct": "5%", "level": "danger"},
     {"name": "Emotional Intensity", "desc": "language tone analysis", "pct": "20%", "level": "danger"},
     {"name": "Context Completeness", "desc": "context analysis", "pct": "25%", "level": "warn"}
   ]
@@ -265,8 +270,8 @@ Rules:
 - type: "danger" if score 65-100, "warn" if 35-64, "safe" if 0-34
 - verdict: "fake", "misleading", "real", or "unverified"
 - Source Credibility pct MUST be "N/A" if no URL in content
-- Be specific about actual claims in the content
-- Use web search to verify facts when possible`;
+- Be specific — mention the actual domain name and what you found about it`;
+- Score must reflect what you actually found via web search — do not guess
 
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -279,7 +284,7 @@ Rules:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-5",
-        max_tokens: 1000,
+        max_tokens: 2000,
         tools: [{ type: "web_search_20250305", name: "web_search" }],
         messages: [{ role: "user", content: prompt }],
       }),
