@@ -241,7 +241,7 @@ Transcription: """${transcription.slice(0, 3000)}"""
   }
 
   // Detect if content contains a URL
-  const hasUrl = /https?:\/\/\S+|www\.\S+|\S+\.(com|co|net|org|info|biz|io)\b/.test(text);
+  const hasUrl = true; // always search
 
   const prompt = `You are an expert fact-checker for AuthentiScan Pro. Your job is to analyze content for misinformation, scams, and credibility risks.
 
