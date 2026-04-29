@@ -1289,6 +1289,14 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
   ];
   const API_URL = "/api/analyze";
 
+  useEffect(() => {
+    fetch(API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "text", text: "ping" }),
+    }).catch(() => {});
+  }, []);
+
   const analyzeLocally = (input) => {
     const t = input.toLowerCase();
     const hasURL = !!input.match(/https?:\/\//);
@@ -1528,9 +1536,9 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
     setStep(0);
     let idx = 0;
     const iv = setInterval(() => {
-      idx++;
-      if (idx < STEPS.length) setStep(idx);
-    }, 900);
+      idx = (idx + 1) % STEPS.length;
+      setStep(idx);
+    }, 1800);
 
     // AUDIO MODE — send base64 audio to backend
     if (inputType === "audio") {
@@ -1566,64 +1574,16 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
           return;
         }
       } catch (e) {}
-      // Audio fallback
       clearInterval(iv);
-      setStep(3);
-      setTimeout(() => {
-        setStep(-1);
-        finalize(
-          {
-            type: "warn",
-            score: 45,
-            verdict: "unverified",
-            title: "Voice Analysis Unavailable",
-            desc: "Backend not configured for audio analysis. Deploy Vercel backend with ELEVENLABS_API_KEY to enable real AI voice detection.",
-            summary: "Voice AI detection requires backend configuration.",
-            signals: [
-              {
-                name: "Voice Origin",
-                desc: "ElevenLabs API key required. Add ELEVENLABS_API_KEY in Vercel.",
-                pct: "N/A",
-                level: "warn",
-                col: "#ffb340",
-                dot: "#ffb340",
-              },
-              {
-                name: "Speech Transcription",
-                desc: "Whisper API key required. Add OPENAI_API_KEY in Vercel.",
-                pct: "N/A",
-                level: "warn",
-                col: "#ffb340",
-                dot: "#ffb340",
-              },
-              {
-                name: "Audio Integrity",
-                desc: "Full audio analysis requires backend configuration.",
-                pct: "N/A",
-                level: "warn",
-                col: "#ffb340",
-                dot: "#ffb340",
-              },
-              {
-                name: "Content Analysis",
-                desc: "Configure backend to enable real-time voice analysis.",
-                pct: "N/A",
-                level: "warn",
-                col: "#ffb340",
-                dot: "#ffb340",
-              },
-            ],
-          },
-          "[Audio Recording]"
-        );
-      }, 400);
+      setStep(-1);
+      setScanError("Analysis failed. Please check your connection and try again.");
       return;
     }
 
     // TEXT / URL MODE
     try {
       const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 30000);
+      const t = setTimeout(() => ctrl.abort(), 45000);
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1643,11 +1603,8 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
       }
     } catch (e) {}
     clearInterval(iv);
-    setStep(3);
-    setTimeout(() => {
-      setStep(-1);
-      finalize(analyzeLocally(inputVal), inputVal);
-    }, 400);
+    setStep(-1);
+    setScanError("Analysis failed. Please check your connection and try again.");
   };
 
   const doScan = () => {
