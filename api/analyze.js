@@ -1,6 +1,3 @@
-import { put, del } from "@vercel/blob";
-import { GoogleGenAI } from "@google/genai";
-
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
@@ -16,10 +13,10 @@ export default async function handler(req, res) {
 
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
 
-  const { text, audio, mode, audioMime, audioExt } = req.body || {};
+  const { text, audio, mode, audioMime } = req.body || {};
 
   // ══════════════════════════════════════
-  // AUDIO MODE — Gemini 2.5 Flash (replaces Resemble AI + ElevenLabs)
+  // AUDIO MODE — Gemini 2.5 Flash via REST (no SDK)
   // ══════════════════════════════════════
   if (mode === "audio" && audio) {
     if (!GEMINI_KEY) {
@@ -27,9 +24,7 @@ export default async function handler(req, res) {
     }
 
     try {
-      const audioBuffer = Buffer.from(audio, "base64");
       const mime = audioMime || "audio/wav";
-      const audioBase64 = audioBuffer.toString("base64");
 
       const geminiPrompt = `You are an expert in deepfake audio detection and fact-checking for AuthentiScan Pro.
 
@@ -62,32 +57,37 @@ Rules:
 - score reflects AI voice probability (0 = definitely human, 100 = definitely AI)
 - transcription: full text of what is spoken in the audio`;
 
-      const genai = new GoogleGenAI({ apiKey: GEMINI_KEY });
-      const model = genai.models;
-
-      const response = await model.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: geminiPrompt },
-              { inlineData: { mimeType: mime, data: audioBase64 } },
+      const geminiRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: geminiPrompt },
+                  { inline_data: { mime_type: mime, data: audio } },
+                ],
+              },
             ],
-          },
-        ],
-      });
+          }),
+        }
+      );
 
-      const rawText = response.text ?? "";
+      if (!geminiRes.ok) {
+        const errData = await geminiRes.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `Gemini error ${geminiRes.status}`);
+      }
+
+      const geminiData = await geminiRes.json();
+      const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
       const clean = rawText.replace(/```json|```/g, "").trim();
       const jsonMatch = clean.match(/\{[\s\S]*\}/);
 
-      if (!jsonMatch) {
-        throw new Error("Gemini did not return valid JSON");
-      }
+      if (!jsonMatch) throw new Error("Gemini did not return valid JSON");
 
-      const analysis = JSON.parse(jsonMatch[0]);
-      return res.status(200).json(analysis);
+      return res.status(200).json(JSON.parse(jsonMatch[0]));
 
     } catch (err) {
       console.error("Audio analysis error:", err.message);
