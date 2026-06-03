@@ -418,7 +418,7 @@ const RISK = {
 /* ══════════════════════════════════════════
    SPLASH (Welcome)
 ══════════════════════════════════════════ */
-function Splash({ onEnter, onLogin }) {
+function Splash({ onLogin, onRegister, onGuest }) {
   return (
     <div
       style={{
@@ -643,12 +643,12 @@ function Splash({ onEnter, onLogin }) {
 
         <button
           className="sp4 btn-p sp-cta"
-          onClick={onEnter}
+          onClick={onLogin}
           style={{
             width: "100%",
             maxWidth: 300,
             padding: "16px 0",
-            marginBottom: 12,
+            marginBottom: 10,
             fontSize: 13,
             letterSpacing: 0.5,
             borderRadius: 14,
@@ -656,22 +656,37 @@ function Splash({ onEnter, onLogin }) {
             transition: "transform .15s,box-shadow .15s",
           }}
         >
-          Start Scanning Free
+          Login
         </button>
 
         <button
           className="sp4 btn-g"
-          onClick={onLogin}
+          onClick={onRegister}
           style={{
             width: "100%",
             maxWidth: 300,
             padding: "14px 0",
+            marginBottom: 14,
             fontSize: 13,
             borderRadius: 14,
           }}
         >
-          Sign In
+          Register
         </button>
+
+        <span
+          onClick={onGuest}
+          style={{
+            fontSize: 13,
+            color: "#c8ff00",
+            cursor: "pointer",
+            fontWeight: 500,
+            textDecoration: "underline",
+            textDecorationColor: "rgba(200,255,0,0.3)",
+          }}
+        >
+          Continue as Guest
+        </span>
 
         <p
           className="sp5"
@@ -693,7 +708,7 @@ function Splash({ onEnter, onLogin }) {
 /* ══════════════════════════════════════════
    LOGIN
 ══════════════════════════════════════════ */
-function LoginScreen({ onLogin, onGuest }) {
+function LoginScreen({ onLogin, onGuest, goRegister }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -872,6 +887,11 @@ function LoginScreen({ onLogin, onGuest }) {
               Demo: user@test.com · test123
             </span>
           </div>
+
+          <div style={{ marginTop:12, textAlign:"center", fontSize:13, color:"#5a6475" }}>
+            Don't have an account?{" "}
+            <span onClick={goRegister} style={{ color:"#c8ff00", fontWeight:600, cursor:"pointer" }}>Register Now</span>
+          </div>
         </div>
       </div>
     </div>
@@ -880,589 +900,135 @@ function LoginScreen({ onLogin, onGuest }) {
 
 
 
+/* ══════════════════════════════════════════
+   REGISTER
+══════════════════════════════════════════ */
+function RegisterScreen({ onLogin, onGuest, goLogin }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [focused, setFocused] = useState("");
+
+  const handleGoogle = async () => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      });
+      if (err) throw err;
+    } catch (e) {
+      setError("Google sign-up failed. Please try email.");
+      setGoogleLoading(false);
+    }
+  };
+
+  const handle = async () => {
+    setError("");
+    if (!name || !email || !pass) { setError("Please fill in all fields."); return; }
+    if (pass.length < 6) { setError("Password must be at least 6 characters."); return; }
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signUp({
+        email, password: pass,
+        options: { data: { full_name: name } }
+      });
+      if (err) throw err;
+      onLogin();
+    } catch (e) {
+      setError(e.message || "Registration failed. Try again.");
+    }
+    setLoading(false);
+  };
+
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        background: "#070a0f",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
-      <style>{`
-        @keyframes lgOrb1{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-20px) scale(1.1)}66%{transform:translate(-20px,15px) scale(0.95)}}
-        @keyframes lgOrb2{0%,100%{transform:translate(0,0)}40%{transform:translate(-24px,20px)}70%{transform:translate(20px,-12px)}}
-        @keyframes lgScanH{0%{top:-2px;opacity:0}5%{opacity:1}95%{opacity:1}100%{top:102%;opacity:0}}
-        @keyframes lgScanV{0%{left:-2px;opacity:0}5%{opacity:.6}95%{opacity:.6}100%{left:102%;opacity:0}}
-        @keyframes lgRing{0%{transform:scale(1);opacity:.55}100%{transform:scale(2.2);opacity:0}}
-        @keyframes lgSpin{to{transform:rotate(360deg)}}
-        @keyframes lgSpinR{to{transform:rotate(-360deg)}}
-        @keyframes lgUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-        .lg1{animation:lgUp .55s ease both .05s}
-        .lg2{animation:lgUp .55s ease both .12s}
-        .lg3{animation:lgUp .55s ease both .19s}
-        .lg4{animation:lgUp .55s ease both .26s}
-        .lg5{animation:lgUp .55s ease both .33s}
-        .lg6{animation:lgUp .55s ease both .40s}
-      `}</style>
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:"#070a0f" }}>
+      <style>{`@keyframes lgSpin{to{transform:rotate(360deg)}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}.rg1{animation:lgUp .5s ease both .05s}.rg2{animation:lgUp .5s ease both .15s}`}</style>
 
-      {/* bg effects */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          pointerEvents: "none",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage:
-              "linear-gradient(rgba(200,255,0,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(200,255,0,0.022) 1px,transparent 1px)",
-            backgroundSize: "44px 44px",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: "5%",
-            left: "5%",
-            width: 280,
-            height: 280,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle,rgba(200,255,0,0.10) 0%,transparent 65%)",
-            animation: "lgOrb1 9s ease-in-out infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "12%",
-            right: "4%",
-            width: 240,
-            height: 240,
-            borderRadius: "50%",
-            background:
-              "radial-gradient(circle,rgba(0,212,255,0.08) 0%,transparent 65%)",
-            animation: "lgOrb2 12s ease-in-out infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            height: "1px",
-            background:
-              "linear-gradient(90deg,transparent,rgba(200,255,0,0.4),transparent)",
-            animation: "lgScanH 8s ease-in-out infinite",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 0,
-            bottom: 0,
-            width: "1px",
-            background:
-              "linear-gradient(180deg,transparent,rgba(0,212,255,0.28),transparent)",
-            animation: "lgScanV 13s ease-in-out infinite 3s",
-          }}
-        />
-      </div>
-
-      {/* logo + spinner */}
-      <div
-        className="lg1"
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          paddingTop: 48,
-          paddingBottom: 4,
-          position: "relative",
-          zIndex: 2,
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            width: 110,
-            height: 110,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              style={{
-                position: "absolute",
-                inset: 0,
-                borderRadius: "50%",
-                border: "1px solid rgba(200,255,0,0.2)",
-                animation: "lgRing 3s ease-out infinite",
-                animationDelay: `${i * 1}s`,
-              }}
-            />
-          ))}
-          <div
-            style={{
-              position: "absolute",
-              width: 100,
-              height: 100,
-              borderRadius: "50%",
-              border: "2px solid transparent",
-              borderTopColor: "rgba(200,255,0,0.8)",
-              borderRightColor: "rgba(200,255,0,0.18)",
-              animation: "lgSpin 3s linear infinite",
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              width: 82,
-              height: 82,
-              borderRadius: "50%",
-              border: "1.5px solid transparent",
-              borderBottomColor: "rgba(0,212,255,0.55)",
-              borderLeftColor: "rgba(0,212,255,0.12)",
-              animation: "lgSpinR 4.5s linear infinite",
-            }}
-          />
-          <div
-            style={{
-              width: 62,
-              height: 62,
-              borderRadius: "50%",
-              zIndex: 1,
-              background: "rgba(200,255,0,0.07)",
-              border: "1px solid rgba(200,255,0,0.15)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <AppLogo size={44} glow={true} />
-          </div>
-        </div>
-        <div
-          style={{
-            marginTop: 12,
-            fontFamily: "var(--mono)",
-            fontSize: 9,
-            letterSpacing: 4,
-            textTransform: "uppercase",
-            color: "rgba(200,255,0,0.6)",
-          }}
-        >
-          Authentiscan Pro
+      <div className="rg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:48, paddingBottom:20 }}>
+        <AppLogo size={44} glow={true} />
+        <div style={{ marginTop:10, fontSize:20, fontWeight:800, color:"#f0f4f8", letterSpacing:-0.8 }}>
+          Hello! <span style={{ color:"#c8ff00" }}>Register</span> to get started
         </div>
       </div>
 
-      {/* headline */}
-      <div
-        className="lg2"
-        style={{
-          textAlign: "center",
-          padding: "16px 28px 20px",
-          position: "relative",
-          zIndex: 2,
-        }}
-      >
-        <h1
-          style={{
-            fontSize: 26,
-            fontWeight: 800,
-            color: "#f0f4f8",
-            margin: "0 0 6px",
-            letterSpacing: -1.2,
-            lineHeight: 1.1,
-          }}
-        >
-          Detect <span style={{ color: "#c8ff00" }}>Misinformation</span>
-          <br />& <span style={{ color: "#00d4ff" }}>AI Voice Fraud</span>
-        </h1>
-        <p
-          style={{
-            fontSize: 10,
-            color: "rgba(240,244,248,0.38)",
-            fontFamily: "var(--mono)",
-            letterSpacing: 3,
-            textTransform: "uppercase",
-          }}
-        >
-          in real time · powered by ai
-        </p>
-      </div>
+      <div className="rg2" style={{ flex:1, padding:"0 22px 40px" }}>
+        <div style={{ background:"rgba(13,17,23,0.9)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"22px 20px" }}>
 
-      {/* form */}
-      <div
-        className="lg3"
-        style={{
-          flex: 1,
-          padding: "0 22px 36px",
-          position: "relative",
-          zIndex: 2,
-        }}
-      >
-        <div
-          style={{
-            background: "rgba(13,17,23,0.88)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 20,
-            padding: "26px 22px",
-            boxShadow:
-              "0 8px 40px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.04)",
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 20,
-              fontWeight: 700,
-              color: "#f0f4f8",
-              margin: "0 0 4px",
-            }}
-          >
-            Welcome back 👋
-          </h2>
-          <p style={{ fontSize: 12, color: "#5a6475", margin: "0 0 20px" }}>
-            Sign in to continue
-          </p>
-
-          {/* email */}
-          <div
-            className="lg4"
-            style={{ position: "relative", marginBottom: 11 }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                left: 14,
-                top: "50%",
-                transform: "translateY(-50%)",
-                zIndex: 1,
-              }}
-            >
-              <Ico
-                d={P.user}
-                s={15}
-                c={focused === "email" ? "#c8ff00" : "#5a6475"}
-              />
+          {/* Name */}
+          <div style={{ position:"relative", marginBottom:10 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.user} s={15} c={focused==="name" ? "#c8ff00" : "#5a6475"} />
             </div>
-            <input
-              className="inp"
-              type="email"
-              placeholder="Email address"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError("");
-              }}
-              onFocus={() => setFocused("email")}
-              onBlur={() => setFocused("")}
-              onKeyDown={(e) => e.key === "Enter" && handle()}
-              style={{
-                padding: "13px 13px 13px 40px",
-                borderColor:
-                  error && !email
-                    ? "rgba(255,59,92,0.5)"
-                    : focused === "email"
-                    ? "#c8ff00"
-                    : "rgba(255,255,255,0.09)",
-              }}
-            />
+            <input className="inp" type="text" placeholder="Full name" value={name}
+              onChange={e => { setName(e.target.value); setError(""); }}
+              onFocus={() => setFocused("name")} onBlur={() => setFocused("")}
+              style={{ padding:"13px 13px 13px 40px", borderColor: focused==="name" ? "#c8ff00" : "rgba(255,255,255,0.09)" }} />
           </div>
 
-          {/* password */}
-          <div
-            className="lg4"
-            style={{ position: "relative", marginBottom: 11 }}
-          >
-            <div
-              style={{
-                position: "absolute",
-                left: 14,
-                top: "50%",
-                transform: "translateY(-50%)",
-                zIndex: 1,
-              }}
-            >
-              <Ico
-                d={P.lock}
-                s={15}
-                c={focused === "pass" ? "#c8ff00" : "#5a6475"}
-              />
+          {/* Email */}
+          <div style={{ position:"relative", marginBottom:10 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.user} s={15} c={focused==="email" ? "#c8ff00" : "#5a6475"} />
             </div>
-            <input
-              className="inp"
-              type={showPass ? "text" : "password"}
-              placeholder="Password"
-              value={pass}
-              onChange={(e) => {
-                setPass(e.target.value);
-                setError("");
-              }}
-              onFocus={() => setFocused("pass")}
-              onBlur={() => setFocused("")}
-              onKeyDown={(e) => e.key === "Enter" && handle()}
-              style={{
-                padding: "13px 42px 13px 40px",
-                borderColor:
-                  error && !pass
-                    ? "rgba(255,59,92,0.5)"
-                    : focused === "pass"
-                    ? "#c8ff00"
-                    : "rgba(255,255,255,0.09)",
-              }}
-            />
-            <button
-              onClick={() => setShowPass((s) => !s)}
-              style={{
-                position: "absolute",
-                right: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                padding: 4,
-                display: "flex",
-                opacity: 0.6,
-              }}
-            >
+            <input className="inp" type="email" placeholder="Email address" value={email}
+              onChange={e => { setEmail(e.target.value); setError(""); }}
+              onFocus={() => setFocused("email")} onBlur={() => setFocused("")}
+              style={{ padding:"13px 13px 13px 40px", borderColor: focused==="email" ? "#c8ff00" : "rgba(255,255,255,0.09)" }} />
+          </div>
+
+          {/* Password */}
+          <div style={{ position:"relative", marginBottom:14 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.lock} s={15} c={focused==="pass" ? "#c8ff00" : "#5a6475"} />
+            </div>
+            <input className="inp" type={showPass ? "text" : "password"} placeholder="Password (min. 6 chars)" value={pass}
+              onChange={e => { setPass(e.target.value); setError(""); }}
+              onFocus={() => setFocused("pass")} onBlur={() => setFocused("")}
+              onKeyDown={e => e.key === "Enter" && handle()}
+              style={{ padding:"13px 42px 13px 40px", borderColor: focused==="pass" ? "#c8ff00" : "rgba(255,255,255,0.09)" }} />
+            <button onClick={() => setShowPass(s => !s)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", padding:4, opacity:0.6 }}>
               <Ico d={showPass ? P.eyeoff : P.eye} s={17} c="#5a6475" />
             </button>
           </div>
 
-          {/* remember + forgot */}
-          <div
-            className="lg4"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 16,
-            }}
-          >
-            <label
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 7,
-                cursor: "pointer",
-                color: "rgba(240,244,248,0.4)",
-                fontSize: 12,
-                userSelect: "none",
-              }}
-            >
-              <input
-                type="checkbox"
-                style={{ accentColor: "#c8ff00", width: 13, height: 13 }}
-              />
-              Remember me
-            </label>
-            <span
-              style={{
-                fontSize: 12,
-                color: "#c8ff00",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
-            >
-              Forgot password?
-            </span>
-          </div>
-
           {error && (
-            <div
-              className="lg4"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                background: "rgba(255,59,92,0.07)",
-                border: "1px solid rgba(255,59,92,0.25)",
-                borderRadius: 10,
-                padding: "9px 12px",
-                marginBottom: 12,
-                fontSize: 12,
-                color: "#ff3b5c",
-              }}
-            >
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,59,92,0.07)", border:"1px solid rgba(255,59,92,0.25)", borderRadius:10, padding:"9px 12px", marginBottom:12, fontSize:12, color:"#ff3b5c" }}>
               <Ico d={P.danger} s={14} c="#ff3b5c" /> {error}
             </div>
           )}
 
-          <button
-            className="lg5 btn-p"
-            onClick={handle}
-            disabled={loading}
-            style={{
-              width: "100%",
-              padding: "15px 0",
-              fontSize: 13,
-              letterSpacing: 0.5,
-              borderRadius: 12,
-              marginBottom: 12,
-              boxShadow: loading ? "none" : "0 4px 24px rgba(200,255,0,0.28)",
-            }}
-          >
-            {loading ? (
-              <span
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    border: "2px solid rgba(0,0,0,0.2)",
-                    borderTopColor: "#070a0f",
-                    display: "inline-block",
-                    animation: "lgSpin .8s linear infinite",
-                  }}
-                />
-                Authenticating...
-              </span>
-            ) : (
-              "Sign In"
-            )}
+          <button className="btn-p" onClick={handle} disabled={loading}
+            style={{ width:"100%", padding:"14px 0", fontSize:13, borderRadius:12, marginBottom:12, boxShadow: loading ? "none" : "0 4px 20px rgba(200,255,0,0.25)" }}>
+            {loading ? <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}><span style={{ width:10, height:10, borderRadius:"50%", border:"2px solid rgba(0,0,0,0.2)", borderTopColor:"#070a0f", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />Creating account...</span> : "Register"}
           </button>
 
-          <div
-            className="lg5"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              marginBottom: 12,
-            }}
-          >
-            <div
-              style={{
-                flex: 1,
-                height: 1,
-                background: "rgba(255,255,255,0.07)",
-              }}
-            />
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 9,
-                color: "#5a6475",
-                letterSpacing: 2,
-              }}
-            >
-              OR
-            </span>
-            <div
-              style={{
-                flex: 1,
-                height: 1,
-                background: "rgba(255,255,255,0.07)",
-              }}
-            />
+          {/* Divider */}
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+            <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.07)" }} />
+            <span style={{ fontFamily:"var(--mono)", fontSize:9, color:"#5a6475", letterSpacing:2 }}>OR REGISTER WITH</span>
+            <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.07)" }} />
           </div>
 
-          <button
-            className="lg5"
-            onClick={handleGoogle}
-            disabled={googleLoading}
-            style={{
-              width: "100%",
-              padding: "13px 0",
-              fontSize: 13,
-              borderRadius: 12,
-              marginBottom: 10,
-              background: googleLoading ? "rgba(255,255,255,0.03)" : "#fff",
-              border: "1px solid rgba(255,255,255,0.12)",
-              color: "#1f1f1f",
-              cursor: googleLoading ? "not-allowed" : "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
-              fontWeight: 600,
-              opacity: googleLoading ? 0.7 : 1,
-              transition: "opacity .2s",
-            }}
-          >
-            {googleLoading ? (
-              <span style={{ display:"flex", alignItems:"center", gap:8, color:"#5a6475" }}>
-                <span style={{ width:10, height:10, borderRadius:"50%", border:"2px solid #ddd", borderTopColor:"#1f1f1f", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />
-                Redirecting...
-              </span>
-            ) : (
-              <>
-                <svg width="18" height="18" viewBox="0 0 48 48">
-                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                  <path fill="none" d="M0 0h48v48H0z"/>
-                </svg>
-                Continue with Google
-              </>
-            )}
+          {/* Google */}
+          <button onClick={handleGoogle} disabled={googleLoading}
+            style={{ width:"100%", padding:"13px 0", marginBottom:12, background: googleLoading ? "rgba(255,255,255,0.85)" : "#fff", border:"none", borderRadius:12, cursor: googleLoading ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontSize:13, fontWeight:600, color:"#1f1f1f", boxShadow:"0 2px 12px rgba(0,0,0,0.3)", opacity: googleLoading ? 0.8 : 1 }}>
+            {googleLoading ? <><span style={{ width:16, height:16, borderRadius:"50%", border:"2px solid #ddd", borderTopColor:"#333", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />Redirecting...</> : <><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</>}
           </button>
 
-          <button
-            className="lg5 btn-g"
-            onClick={onGuest}
-            style={{
-              width: "100%",
-              padding: "13px 0",
-              fontSize: 12,
-              borderRadius: 12,
-              letterSpacing: 0.5,
-            }}
-          >
-            Try Free · No Account Needed
+          {/* Guest */}
+          <button className="btn-g" onClick={onGuest} style={{ width:"100%", padding:"12px 0", fontSize:12, borderRadius:12, marginBottom:14 }}>
+            Continue as Guest
           </button>
 
-          <div
-            style={{
-              marginTop: 16,
-              padding: "10px 14px",
-              textAlign: "center",
-              background: "rgba(0,212,255,0.04)",
-              border: "1px dashed rgba(0,212,255,0.18)",
-              borderRadius: 10,
-            }}
-          >
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 7,
-                color: "#5a6475",
-                letterSpacing: 3,
-                textTransform: "uppercase",
-                marginBottom: 4,
-              }}
-            >
-              Demo credentials
-            </div>
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 12,
-                color: "#00d4ff",
-              }}
-            >
-              user@test.com · test123
-            </div>
+          <div style={{ textAlign:"center", fontSize:13, color:"#5a6475" }}>
+            Already have an account?{" "}
+            <span onClick={goLogin} style={{ color:"#c8ff00", fontWeight:600, cursor:"pointer" }}>Login Now</span>
           </div>
         </div>
       </div>
@@ -3367,15 +2933,24 @@ export default function App() {
         }}
       >
         {screen === "splash" && (
-          <Splash onEnter={() => go("scan")} onLogin={() => go("login")} />
+          <Splash
+            onLogin={() => go("login")}
+            onRegister={() => go("register")}
+            onGuest={() => go("scan")}
+          />
         )}
         {screen === "login" && (
           <LoginScreen
-            onLogin={() => {
-              setLoggedIn(true);
-              go("scan");
-            }}
+            onLogin={() => { setLoggedIn(true); go("scan"); }}
             onGuest={() => go("scan")}
+            goRegister={() => go("register")}
+          />
+        )}
+        {screen === "register" && (
+          <RegisterScreen
+            onLogin={() => { setLoggedIn(true); go("scan"); }}
+            onGuest={() => go("scan")}
+            goLogin={() => go("login")}
           />
         )}
         {screen === "scan" && (
