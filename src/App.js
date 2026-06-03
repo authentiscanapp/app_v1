@@ -905,13 +905,6 @@ function LoginScreen({ onLogin, onGuest, goRegister }) {
             Continue as Guest · No Account Needed
           </button>
 
-          {/* Demo hint */}
-          <div style={{ marginTop:14, textAlign:"center" }}>
-            <span style={{ fontFamily:"var(--mono)", fontSize:9, color:"#5a6475", letterSpacing:1 }}>
-              Demo: user@test.com · test123
-            </span>
-          </div>
-
           <div style={{ marginTop:12, textAlign:"center", fontSize:13, color:"#5a6475" }}>
             Don't have an account?{" "}
             <span onClick={goRegister} style={{ color:"#c8ff00", fontWeight:600, cursor:"pointer" }}>Register Now</span>
@@ -3026,7 +3019,7 @@ export default function App() {
 
     // Save to Supabase if logged in
     if (supaUser) {
-      await supabase.from("scans").insert({
+      const { error: insertError } = await supabase.from("scans").insert({
         user_id: supaUser.id,
         input_text: r.input?.slice(0, 60) || "Scan result",
         scan_type: r.scanType || "text",
@@ -3034,6 +3027,10 @@ export default function App() {
         score: r.score,
         verdict: r.verdict || "",
       });
+      if (insertError) console.error("Supabase insert error:", insertError);
+      else console.log("Scan saved to Supabase ✓", supaUser.id);
+    } else {
+      console.log("Guest mode - scan not saved");
     }
 
     go("result");
