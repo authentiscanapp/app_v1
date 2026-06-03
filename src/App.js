@@ -720,7 +720,7 @@ function LoginScreen({ onLogin, onGuest }) {
   const handle = () => {
     setError("");
     if (!email || !pass) {
-      setError("Please enter your email and password.");
+      setError("Please fill in all fields.");
       return;
     }
     setLoading(true);
@@ -731,6 +731,154 @@ function LoginScreen({ onLogin, onGuest }) {
       else setError("Invalid credentials. Try user@test.com / test123");
     }, 900);
   };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#070a0f" }}>
+      <style>{`
+        @keyframes lgSpin{to{transform:rotate(360deg)}}
+        @keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        .lg1{animation:lgUp .5s ease both .05s}
+        .lg2{animation:lgUp .5s ease both .15s}
+        .lg3{animation:lgUp .5s ease both .25s}
+      `}</style>
+
+      {/* Logo area */}
+      <div className="lg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:56, paddingBottom:24 }}>
+        <AppLogo size={52} glow={true} />
+        <div style={{ marginTop:12, fontSize:22, fontWeight:800, color:"#f0f4f8", letterSpacing:-0.8 }}>
+          Authentiscan <span style={{ color:"#c8ff00" }}>Pro</span>
+        </div>
+        <div style={{ marginTop:4, fontSize:12, color:"#5a6475" }}>
+          Detect misinformation in real time
+        </div>
+      </div>
+
+      {/* Form card */}
+      <div className="lg2" style={{ flex:1, padding:"0 22px 40px" }}>
+        <div style={{ background:"rgba(13,17,23,0.9)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"24px 20px" }}>
+
+          {/* Google button — primary */}
+          <button
+            onClick={handleGoogle}
+            disabled={googleLoading}
+            style={{
+              width:"100%", padding:"14px 0", marginBottom:12,
+              background: googleLoading ? "rgba(255,255,255,0.85)" : "#fff",
+              border:"none", borderRadius:12, cursor: googleLoading ? "not-allowed" : "pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+              fontSize:14, fontWeight:600, color:"#1f1f1f",
+              boxShadow:"0 2px 12px rgba(0,0,0,0.3)",
+              opacity: googleLoading ? 0.8 : 1,
+              transition:"opacity .2s, transform .15s",
+            }}
+          >
+            {googleLoading ? (
+              <>
+                <span style={{ width:18, height:18, borderRadius:"50%", border:"2px solid #ddd", borderTopColor:"#333", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <svg width="18" height="18" viewBox="0 0 48 48">
+                  <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                  <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                  <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                  <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                Continue with Google
+              </>
+            )}
+          </button>
+
+          {/* Divider */}
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+            <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.07)" }} />
+            <span style={{ fontFamily:"var(--mono)", fontSize:9, color:"#5a6475", letterSpacing:2 }}>OR</span>
+            <div style={{ flex:1, height:1, background:"rgba(255,255,255,0.07)" }} />
+          </div>
+
+          {/* Email */}
+          <div style={{ position:"relative", marginBottom:10 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.user} s={15} c={focused==="email" ? "#c8ff00" : "#5a6475"} />
+            </div>
+            <input
+              className="inp"
+              type="email"
+              placeholder="Email address"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(""); }}
+              onFocus={() => setFocused("email")}
+              onBlur={() => setFocused("")}
+              onKeyDown={e => e.key === "Enter" && handle()}
+              style={{ padding:"13px 13px 13px 40px", borderColor: focused==="email" ? "#c8ff00" : "rgba(255,255,255,0.09)" }}
+            />
+          </div>
+
+          {/* Password */}
+          <div style={{ position:"relative", marginBottom:14 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.lock} s={15} c={focused==="pass" ? "#c8ff00" : "#5a6475"} />
+            </div>
+            <input
+              className="inp"
+              type={showPass ? "text" : "password"}
+              placeholder="Password"
+              value={pass}
+              onChange={e => { setPass(e.target.value); setError(""); }}
+              onFocus={() => setFocused("pass")}
+              onBlur={() => setFocused("")}
+              onKeyDown={e => e.key === "Enter" && handle()}
+              style={{ padding:"13px 42px 13px 40px", borderColor: focused==="pass" ? "#c8ff00" : "rgba(255,255,255,0.09)" }}
+            />
+            <button onClick={() => setShowPass(s => !s)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", padding:4, opacity:0.6 }}>
+              <Ico d={showPass ? P.eyeoff : P.eye} s={17} c="#5a6475" />
+            </button>
+          </div>
+
+          {error && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,59,92,0.07)", border:"1px solid rgba(255,59,92,0.25)", borderRadius:10, padding:"9px 12px", marginBottom:12, fontSize:12, color:"#ff3b5c" }}>
+              <Ico d={P.danger} s={14} c="#ff3b5c" /> {error}
+            </div>
+          )}
+
+          {/* Sign in button */}
+          <button
+            className="btn-p"
+            onClick={handle}
+            disabled={loading}
+            style={{ width:"100%", padding:"14px 0", fontSize:13, borderRadius:12, marginBottom:10, boxShadow: loading ? "none" : "0 4px 20px rgba(200,255,0,0.25)" }}
+          >
+            {loading ? (
+              <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:"50%", border:"2px solid rgba(0,0,0,0.2)", borderTopColor:"#070a0f", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />
+                Signing in...
+              </span>
+            ) : "Sign In with Email"}
+          </button>
+
+          {/* Guest */}
+          <button
+            className="btn-g"
+            onClick={onGuest}
+            style={{ width:"100%", padding:"13px 0", fontSize:12, borderRadius:12 }}
+          >
+            Continue as Guest · No Account Needed
+          </button>
+
+          {/* Demo hint */}
+          <div style={{ marginTop:14, textAlign:"center" }}>
+            <span style={{ fontFamily:"var(--mono)", fontSize:9, color:"#5a6475", letterSpacing:1 }}>
+              Demo: user@test.com · test123
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 
   return (
     <div
@@ -2907,7 +3055,21 @@ function HistoryScreen({ go, history }) {
 /* ══════════════════════════════════════════
    PROFILE
 ══════════════════════════════════════════ */
-function ProfileScreen({ go, onLogout, scansUsed }) {
+function ProfileScreen({ go, onLogout, scansUsed, history }) {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUser(user);
+    });
+  }, []);
+
+  const name = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Guest";
+  const email = user?.email || "guest@authentiscanapp.com";
+  const avatar = user?.user_metadata?.avatar_url || null;
+  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2);
+  const flagsFound = history.filter(h => h.type === "danger" || h.type === "warn").length;
+
   return (
     <div
       style={{
@@ -2933,18 +3095,36 @@ function ProfileScreen({ go, onLogout, scansUsed }) {
           }}
         >
           <div style={{ position: "relative" }}>
-            <img
-              src={BIANCA}
-              alt="Profile"
-              style={{
+            {avatar ? (
+              <img
+                src={avatar}
+                alt="Profile"
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: `2px solid ${C.accent}`,
+                  boxShadow: `0 0 16px rgba(200,255,0,0.2)`,
+                }}
+              />
+            ) : (
+              <div style={{
                 width: 68,
                 height: 68,
                 borderRadius: "50%",
-                objectFit: "cover",
+                background: "rgba(200,255,0,0.12)",
                 border: `2px solid ${C.accent}`,
-                boxShadow: `0 0 16px rgba(200,255,0,0.2)`,
-              }}
-            />
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 22,
+                fontWeight: 800,
+                color: C.accent,
+              }}>
+                {initials}
+              </div>
+            )}
             <div
               style={{
                 position: "absolute",
@@ -2967,10 +3147,10 @@ function ProfileScreen({ go, onLogout, scansUsed }) {
                 marginBottom: 2,
               }}
             >
-              Bianca Costa
+              {name}
             </div>
             <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>
-              biancacosta@authentiscanapp.com
+              {email}
             </div>
             <div
               style={{
@@ -3017,8 +3197,8 @@ function ProfileScreen({ go, onLogout, scansUsed }) {
         >
           {[
             [String(scansUsed), "Scans Done"],
-            ["8", "Flags Found"],
-            ["3", "Days Active"],
+            [String(flagsFound), "Flags Found"],
+            [String(Math.min(history.length > 0 ? 1 : 0, 7)), "Days Active"],
           ].map(([v, l]) => (
             <div
               key={l}
@@ -3213,9 +3393,11 @@ export default function App() {
             go={go}
             onLogout={() => {
               setLoggedIn(false);
+              supabase.auth.signOut();
               go("splash");
             }}
             scansUsed={scansUsed}
+            history={history}
           />
         )}
       </div>
