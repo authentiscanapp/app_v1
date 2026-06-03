@@ -747,19 +747,28 @@ function LoginScreen({ onLogin, onGuest, goRegister }) {
     }
   };
 
-  const handle = () => {
+  const handle = async () => {
     setError("");
     if (!email || !pass) {
       setError("Please fill in all fields.");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
+    // Demo credentials
+    if (email.toLowerCase() === "user@test.com" && pass === "test123") {
       setLoading(false);
-      if (email.toLowerCase() === "user@test.com" && pass === "test123")
-        onLogin();
-      else setError("Invalid credentials. Try user@test.com / test123");
-    }, 900);
+      onLogin(null);
+      return;
+    }
+    // Real Supabase auth
+    try {
+      const { data, error: err } = await supabase.auth.signInWithPassword({ email, password: pass });
+      if (err) throw err;
+      onLogin(data.user);
+    } catch(e) {
+      setError(e.message || "Invalid email or password.");
+    }
+    setLoading(false);
   };
 
   return (
@@ -927,6 +936,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [focused, setFocused] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleGoogle = async () => {
     setError("");
@@ -949,12 +959,23 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
     if (pass.length < 6) { setError("Password must be at least 6 characters."); return; }
     setLoading(true);
     try {
-      const { error: err } = await supabase.auth.signUp({
+      const { data, error: err } = await supabase.auth.signUp({
         email, password: pass,
         options: { data: { full_name: name } }
       });
       if (err) throw err;
-      onLogin();
+      // If user already exists or auto-confirm is on, sign in directly
+      if (data?.user) {
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({ email, password: pass });
+        if (!signInErr && signInData?.user) {
+          onLogin(signInData.user);
+        } else {
+          // Email confirmation required
+          setShowConfirmModal(true);
+          setLoading(false);
+          return;
+        }
+      }
     } catch (e) {
       setError(e.message || "Registration failed. Try again.");
     }
@@ -964,6 +985,45 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:"#070a0f" }}>
       <style>{`@keyframes lgSpin{to{transform:rotate(360deg)}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}.rg1{animation:lgUp .5s ease both .05s}.rg2{animation:lgUp .5s ease both .15s}`}</style>
+
+      {/* Email Confirmation Modal */}
+      {showConfirmModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 24px" }}>
+          <div style={{ background:"#0d1117", border:"1px solid rgba(200,255,0,0.25)", borderRadius:20, padding:"28px 24px", maxWidth:340, width:"100%", textAlign:"center", boxShadow:"0 0 40px rgba(200,255,0,0.08)" }}>
+            {/* Icon */}
+            <div style={{ width:56, height:56, borderRadius:"50%", background:"rgba(200,255,0,0.1)", border:"1.5px solid rgba(200,255,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c8ff00" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
+            <div style={{ fontSize:17, fontWeight:700, color:"#f0f4f8", marginBottom:8 }}>
+              Check your email
+            </div>
+            <div style={{ fontSize:13, color:"#8a9ab5", lineHeight:1.6, marginBottom:6 }}>
+              We sent a confirmation link to
+            </div>
+            <div style={{ fontSize:13, fontWeight:600, color:"#c8ff00", marginBottom:16, wordBreak:"break-all" }}>
+              {email}
+            </div>
+            <div style={{ fontSize:12, color:"#5a6475", lineHeight:1.6, marginBottom:24 }}>
+              Click the link in the email to activate your account, then come back to sign in.
+            </div>
+            <button
+              onClick={() => { setShowConfirmModal(false); goLogin(); }}
+              style={{ width:"100%", padding:"13px 0", background:"#c8ff00", border:"none", borderRadius:12, fontSize:13, fontWeight:700, color:"#070a0f", cursor:"pointer", marginBottom:10 }}
+            >
+              Go to Login
+            </button>
+            <button
+              onClick={() => setShowConfirmModal(false)}
+              style={{ width:"100%", padding:"11px 0", background:"transparent", border:"1px solid rgba(255,255,255,0.08)", borderRadius:12, fontSize:12, color:"#5a6475", cursor:"pointer" }}
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="rg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:48, paddingBottom:20 }}>
         <AppLogo size={44} glow={true} />
@@ -2894,19 +2954,25 @@ export default function App() {
   // Listen for Supabase auth (Google OAuth callback)
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+      if (session?.user) {
         setLoggedIn(true);
         setSupaUser(session.user);
-        setScreen("scan");
+        if (screen === "splash" || screen === "login" || screen === "register") {
+          setScreen("scan");
+        }
       }
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
         setLoggedIn(true);
         setSupaUser(session.user);
-        setScreen("scan");
-      } else {
+        // Only auto-navigate on actual sign in events
+        if (event === "SIGNED_IN") {
+          setScreen("scan");
+        }
+      } else if (event === "SIGNED_OUT") {
         setSupaUser(null);
+        setLoggedIn(false);
       }
     });
     return () => subscription.unsubscribe();
