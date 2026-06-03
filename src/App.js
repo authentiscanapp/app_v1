@@ -194,13 +194,17 @@ const Nav = ({ right, onBack }) => (
   </div>
 );
 
-const BNav = ({ active, go }) => {
+const BNav = ({ active, go, user }) => {
   const tabs = [
     { id: "scan", label: "Scan", d: P.scan },
     { id: "result", label: "Result", d: P.result },
     { id: "history", label: "History", d: P.hist },
     { id: "profile", label: "Profile", d: P.prof },
   ];
+  const avatar = user?.user_metadata?.avatar_url;
+  const name = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "";
+  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2) || "G";
+
   return (
     <div
       style={{
@@ -221,6 +225,7 @@ const BNav = ({ active, go }) => {
     >
       {tabs.map((t) => {
         const on = active === t.id;
+        const isProfile = t.id === "profile";
         return (
           <button
             key={t.id}
@@ -242,7 +247,17 @@ const BNav = ({ active, go }) => {
               transition: "all .2s",
             }}
           >
-            <Ico d={t.d} s={19} c={on ? "#c8ff00" : "#5a6475"} />
+            {isProfile && user ? (
+              avatar ? (
+                <img src={avatar} alt="" style={{ width:22, height:22, borderRadius:"50%", objectFit:"cover", border: on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)" }} />
+              ) : (
+                <div style={{ width:22, height:22, borderRadius:"50%", background: on ? "rgba(200,255,0,0.2)" : "rgba(255,255,255,0.1)", border: on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color: on ? "#c8ff00" : "#f0f4f8" }}>
+                  {initials}
+                </div>
+              )
+            ) : (
+              <Ico d={t.d} s={19} c={on ? "#c8ff00" : "#5a6475"} />
+            )}
             <span
               style={{
                 fontFamily: "var(--mono)",
@@ -1948,7 +1963,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
           {scansUsed >= MAX_SCANS ? "Limit Reached — Upgrade" : "Scan Now"}
         </button>
       </div>
-      <BNav active="scan" go={go} />
+      <BNav active="scan" go={go} user={supaUser} />
     </div>
   );
 }
@@ -2500,7 +2515,7 @@ function ResultScreen({ result, go }) {
           </button>
         </div>
       </div>
-      <BNav active="result" go={go} />
+      <BNav active="result" go={go} user={supaUser} />
     </div>
   );
 }
@@ -2613,7 +2628,7 @@ function HistoryScreen({ go, history }) {
           })
         )}
       </div>
-      <BNav active="history" go={go} />
+      <BNav active="history" go={go} user={supaUser} />
     </div>
   );
 }
@@ -2621,19 +2636,12 @@ function HistoryScreen({ go, history }) {
 /* ══════════════════════════════════════════
    PROFILE
 ══════════════════════════════════════════ */
-function ProfileScreen({ go, onLogout, scansUsed, history }) {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setUser(user);
-    });
-  }, []);
-
+function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
+  const user = supaUser;
   const name = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Guest";
   const email = user?.email || "guest@authentiscanapp.com";
   const avatar = user?.user_metadata?.avatar_url || null;
-  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2);
+  const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2) || "G";
   const flagsFound = history.filter(h => h.type === "danger" || h.type === "warn").length;
 
   return (
@@ -2865,7 +2873,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history }) {
           Sign Out
         </button>
       </div>
-      <BNav active="profile" go={go} />
+      <BNav active="profile" go={go} user={supaUser} />
     </div>
   );
 }
@@ -2876,6 +2884,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history }) {
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [loggedIn, setLoggedIn] = useState(false);
+  const [supaUser, setSupaUser] = useState(null);
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [scansUsed, setScansUsed] = useState(0);
@@ -2887,13 +2896,17 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         setLoggedIn(true);
+        setSupaUser(session.user);
         setScreen("scan");
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setLoggedIn(true);
+        setSupaUser(session.user);
         setScreen("scan");
+      } else {
+        setSupaUser(null);
       }
     });
     return () => subscription.unsubscribe();
@@ -2941,14 +2954,14 @@ export default function App() {
         )}
         {screen === "login" && (
           <LoginScreen
-            onLogin={() => { setLoggedIn(true); go("scan"); }}
+            onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
             onGuest={() => go("scan")}
             goRegister={() => go("register")}
           />
         )}
         {screen === "register" && (
           <RegisterScreen
-            onLogin={() => { setLoggedIn(true); go("scan"); }}
+            onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
             onGuest={() => go("scan")}
             goLogin={() => go("login")}
           />
@@ -2973,6 +2986,7 @@ export default function App() {
             }}
             scansUsed={scansUsed}
             history={history}
+            supaUser={supaUser}
           />
         )}
       </div>
