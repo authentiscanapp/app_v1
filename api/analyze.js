@@ -16,7 +16,7 @@ export default async function handler(req, res) {
   const { text, audio, mode, audioMime } = req.body || {};
 
   // ══════════════════════════════════════
-  // AUDIO MODE — Gemini 2.5 Flash via REST (no SDK)
+  // AUDIO MODE — Gemini 2.5 Flash via REST (no SDK )
   // ══════════════════════════════════════
   if (mode === "audio" && audio) {
     if (!GEMINI_KEY) {
