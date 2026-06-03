@@ -2978,24 +2978,64 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleResult = (r) => {
+  // Load history from Supabase on login
+  useEffect(() => {
+    if (!supaUser) return;
+    supabase
+      .from("scans")
+      .select("*")
+      .eq("user_id", supaUser.id)
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .then(({ data, error }) => {
+        if (error || !data) return;
+        setHistory(
+          data.map((row) => ({
+            text: row.input_text || "Scan result",
+            type: row.result_type,
+            score: row.score,
+            time: new Date(row.created_at).toLocaleString("en-US", {
+              month: "short",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+          }))
+        );
+        setScansUsed(data.length);
+      });
+  }, [supaUser]);
+
+  const handleResult = async (r) => {
     setResult(r);
-    setHistory((h) => [
-      {
-        text: r.input?.slice(0, 60) || "Scan result",
-        type: r.type,
+    const item = {
+      text: r.input?.slice(0, 60) || "Scan result",
+      type: r.type,
+      score: r.score,
+      time:
+        r.timestamp ||
+        new Date().toLocaleString("en-US", {
+          month: "short",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+    };
+    setHistory((h) => [item, ...h.slice(0, 49)]);
+    setScansUsed((n) => n + 1);
+
+    // Save to Supabase if logged in
+    if (supaUser) {
+      await supabase.from("scans").insert({
+        user_id: supaUser.id,
+        input_text: r.input?.slice(0, 60) || "Scan result",
+        scan_type: r.scanType || "text",
+        result_type: r.type,
         score: r.score,
-        time:
-          r.timestamp ||
-          new Date().toLocaleString("en-US", {
-            month: "short",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-      },
-      ...h.slice(0, 49),
-    ]);
+        verdict: r.verdict || "",
+      });
+    }
+
     go("result");
   };
 
