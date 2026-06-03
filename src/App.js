@@ -1114,7 +1114,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
 /* ══════════════════════════════════════════
    SCAN
 ══════════════════════════════════════════ */
-function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
+function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
@@ -2031,7 +2031,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed }) {
 /* ══════════════════════════════════════════
    RESULT
 ══════════════════════════════════════════ */
-function ResultScreen({ result, go }) {
+function ResultScreen({ result, go, supaUser }) {
   const type = result?.type || "warn";
   const color =
     type === "danger" ? C.danger : type === "warn" ? C.warn : C.safe;
@@ -2583,7 +2583,7 @@ function ResultScreen({ result, go }) {
 /* ══════════════════════════════════════════
    HISTORY
 ══════════════════════════════════════════ */
-function HistoryScreen({ go, history }) {
+function HistoryScreen({ go, history, supaUser }) {
   const icons = { danger: P.danger, warn: P.warn, safe: P.safe };
   const colors = { danger: C.danger, warn: C.warn, safe: C.safe };
   return (
@@ -3038,10 +3038,11 @@ export default function App() {
             setResult={handleResult}
             scansUsed={scansUsed}
             setScansUsed={setScansUsed}
+            supaUser={supaUser}
           />
         )}
-        {screen === "result" && <ResultScreen result={result} go={go} />}
-        {screen === "history" && <HistoryScreen go={go} history={history} />}
+        {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} />}
+        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} />}
         {screen === "profile" && (
           <ProfileScreen
             go={go}
