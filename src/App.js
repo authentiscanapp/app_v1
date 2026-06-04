@@ -300,14 +300,7 @@ const UpBanner = ({ msg }) => (
           marginBottom: 2,
         }}
       >
-        Upgrade to Pro — $7.99/mo
-      </div>
-      <div style={{ fontSize: 12, color: "#5a6475", lineHeight: 1.5 }}>
-        {" "}
-        {msg}
-      </div>
-    </div>
-    <button
+        Upgrade to Pro
       className="btn-p"
       onClick={() => window.open("https://www.authentiscanapp.com/", "_blank")}
       style={{
@@ -1405,10 +1398,16 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
         const res = await fetch(API_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mode: "audio", audio: audioB64, audioMime: audioBlobRef.current?._mime || "audio/wav", audioExt: audioBlobRef.current?._ext || "wav" }),
+          body: JSON.stringify({ mode: "audio", audio: audioB64, audioMime: audioBlobRef.current?._mime || "audio/wav", audioExt: audioBlobRef.current?._ext || "wav", userId: supaUser?.id || null }),
           signal: ctrl.signal,
         });
         clearTimeout(t);
+        if (res.status === 429) {
+          clearInterval(iv);
+          setStep(-1);
+          setScanError("You've reached your 5 free scans for today. Upgrade to Pro for unlimited scans.");
+          return;
+        }
         if (res.ok) {
           const d = await res.json();
           clearInterval(iv);
@@ -1433,10 +1432,16 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
       const res = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: inputType, text: inputVal }),
+        body: JSON.stringify({ mode: inputType, text: inputVal, userId: supaUser?.id || null }),
         signal: ctrl.signal,
       });
       clearTimeout(t);
+      if (res.status === 429) {
+        clearInterval(iv);
+        setStep(-1);
+        setScanError("You've reached your 5 free scans for today. Upgrade to Pro for unlimited scans.");
+        return;
+      }
       if (res.ok) {
         const d = await res.json();
         clearInterval(iv);
@@ -2917,7 +2922,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
               borderRadius: 12,
             }}
           >
-            Upgrade to Pro — $7.99/mo
+            Upgrade to Pro
           </button>
         </div>
 
@@ -2988,7 +2993,11 @@ export default function App() {
 
   // Load history from Supabase on login
   useEffect(() => {
-    if (!supaUser) return;
+    if (!supaUser) {
+      setHistory([]);
+      setScansUsed(0);
+      return;
+    }
     supabase
       .from("scans")
       .select("*")
@@ -3010,7 +3019,10 @@ export default function App() {
             }),
           }))
         );
-        setScansUsed(data.length);
+        // Count only today's scans for the daily limit
+        const today = new Date().toISOString().slice(0, 10);
+        const todayScans = data.filter(r => r.created_at?.slice(0, 10) === today).length;
+        setScansUsed(todayScans);
       });
   }, [supaUser]);
 
@@ -3064,20 +3076,20 @@ export default function App() {
           <Splash
             onLogin={() => go("login")}
             onRegister={() => go("register")}
-            onGuest={() => { supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); go("scan"); }}
+            onGuest={async () => { await supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); setHistory([]); setScansUsed(0); go("scan"); }}
           />
         )}
         {screen === "login" && (
           <LoginScreen
             onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
-            onGuest={() => { supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); go("scan"); }}
+            onGuest={async () => { await supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); setHistory([]); setScansUsed(0); go("scan"); }}
             goRegister={() => go("register")}
           />
         )}
         {screen === "register" && (
           <RegisterScreen
             onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
-            onGuest={() => { supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); go("scan"); }}
+            onGuest={async () => { await supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); setHistory([]); setScansUsed(0); go("scan"); }}
             goLogin={() => go("login")}
           />
         )}
@@ -3097,6 +3109,9 @@ export default function App() {
             go={go}
             onLogout={() => {
               setLoggedIn(false);
+              setSupaUser(null);
+              setHistory([]);
+              setScansUsed(0);
               supabase.auth.signOut();
               go("splash");
             }}
