@@ -2695,7 +2695,22 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
   const email = user?.email || "guest@authentiscanapp.com";
   const avatar = user?.user_metadata?.avatar_url || null;
   const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2) || "G";
-  const flagsFound = history.filter(h => h.type === "danger" || h.type === "warn").length;
+
+  const [stats, setStats] = useState({ scans: 0, flags: 0, days: 0 });
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("scans")
+      .select("result_type, created_at")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (!data) return;
+        const flags = data.filter(r => r.result_type === "danger" || r.result_type === "warn").length;
+        const days = new Set(data.map(r => r.created_at?.slice(0, 10))).size;
+        setStats({ scans: data.length, flags, days });
+      });
+  }, [user]);
 
   return (
     <div
@@ -2823,9 +2838,9 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
           }}
         >
           {[
-            [String(scansUsed), "Scans Done"],
-            [String(flagsFound), "Flags Found"],
-            [String(Math.min(history.length > 0 ? 1 : 0, 7)), "Days Active"],
+            [String(stats.scans), "Scans Done"],
+            [String(stats.flags), "Flags Found"],
+            [String(stats.days), "Days Active"],
           ].map(([v, l]) => (
             <div
               key={l}
@@ -3027,10 +3042,7 @@ export default function App() {
         score: r.score,
         verdict: r.verdict || "",
       });
-      if (insertError) console.error("Supabase insert error:", insertError);
-      else console.log("Scan saved to Supabase ✓", supaUser.id);
-    } else {
-      console.log("Guest mode - scan not saved");
+      if (insertError) console.warn("Scan save failed:", insertError.code);
     }
 
     go("result");
@@ -3052,20 +3064,20 @@ export default function App() {
           <Splash
             onLogin={() => go("login")}
             onRegister={() => go("register")}
-            onGuest={() => go("scan")}
+            onGuest={() => { supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); go("scan"); }}
           />
         )}
         {screen === "login" && (
           <LoginScreen
             onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
-            onGuest={() => go("scan")}
+            onGuest={() => { supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); go("scan"); }}
             goRegister={() => go("register")}
           />
         )}
         {screen === "register" && (
           <RegisterScreen
             onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
-            onGuest={() => go("scan")}
+            onGuest={() => { supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); go("scan"); }}
             goLogin={() => go("login")}
           />
         )}
