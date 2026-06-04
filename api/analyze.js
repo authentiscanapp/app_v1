@@ -16,12 +16,52 @@ export default async function handler(req, res) {
 
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
 
-  const { text, audio, mode, audioMime, audioExt } = req.body || {};
+  // ══════════════════════════════════════
+  // SCAN LIMIT CHECK
+  // ══════════════════════════════════════
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const FREE_DAILY_LIMIT = 5;
 
-  // ══════════════════════════════════════
-  // AUDIO MODE
-  // ══════════════════════════════════════
-  if (mode === "audio" && audio) {
+  const userId = req.body?.userId || null;
+
+  if (userId && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
+    try {
+      // Check if user is pro
+      const profileRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=is_pro`,
+        { headers: { "apikey": SUPABASE_SERVICE_KEY, "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}` } }
+      );
+      const profiles = await profileRes.json();
+      const isPro = profiles?.[0]?.is_pro === true;
+
+      if (!isPro) {
+        // Count today's scans
+        const today = new Date().toISOString().slice(0, 10);
+        const scansRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/scans?user_id=eq.${userId}&created_at=gte.${today}T00:00:00Z&select=id`,
+          { headers: { "apikey": SUPABASE_SERVICE_KEY, "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`, "Prefer": "count=exact" } }
+        );
+        const countHeader = scansRes.headers.get("content-range");
+        const todayCount = countHeader ? parseInt(countHeader.split("/")[1]) : 0;
+
+        if (todayCount >= FREE_DAILY_LIMIT) {
+          return res.status(429).json({
+            error: "Daily scan limit reached",
+            limit: FREE_DAILY_LIMIT,
+            code: "LIMIT_REACHED",
+          });
+        }
+      }
+    } catch (e) {
+      // Don't block scan if limit check fails
+      console.warn("Limit check failed:", e.message);
+    }
+  }
+
+
+
+  const { text, audio, mode, audioMime, audioExt } = req.body || {};
     try {
       const audioBuffer = Buffer.from(audio, "base64");
       const mime = audioMime || "audio/wav";
