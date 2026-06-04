@@ -27,7 +27,6 @@ export default async function handler(req, res) {
 
   if (userId && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
-      // Check if user is pro
       const profileRes = await fetch(
         `${SUPABASE_URL}/rest/v1/profiles?id=eq.${userId}&select=is_pro`,
         { headers: { "apikey": SUPABASE_SERVICE_KEY, "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}` } }
@@ -36,7 +35,6 @@ export default async function handler(req, res) {
       const isPro = profiles?.[0]?.is_pro === true;
 
       if (!isPro) {
-        // Count today's scans
         const today = new Date().toISOString().slice(0, 10);
         const scansRes = await fetch(
           `${SUPABASE_URL}/rest/v1/scans?user_id=eq.${userId}&created_at=gte.${today}T00:00:00Z&select=id`,
@@ -54,20 +52,21 @@ export default async function handler(req, res) {
         }
       }
     } catch (e) {
-      // Don't block scan if limit check fails
       console.warn("Limit check failed:", e.message);
     }
   }
 
-
-
   const { text, audio, mode, audioMime, audioExt } = req.body || {};
+
+  // ══════════════════════════════════════
+  // AUDIO MODE
+  // ══════════════════════════════════════
+  if (mode === "audio" && audio) {
     try {
       const audioBuffer = Buffer.from(audio, "base64");
       const mime = audioMime || "audio/wav";
       const ext = audioExt || "wav";
 
-      // ── STEP 1: Resemble Detect ──
       let resembleScore = null;
       let resembleLabel = null;
       let resembleError = null;
@@ -112,7 +111,6 @@ export default async function handler(req, res) {
         resembleError = "RESEMBLE_API_KEY not configured";
       }
 
-      // ── STEP 2: ElevenLabs STT ──
       let transcription = null;
       let transcriptionError = null;
 
@@ -140,7 +138,6 @@ export default async function handler(req, res) {
         }
       }
 
-      // ── STEP 3: Retorna resultado com score do Resemble ──
       if (resembleScore !== null) {
         const aiPct = Math.round(resembleScore * 100);
         const isAI = resembleLabel === "fake" || resembleScore > 0.5;
@@ -196,7 +193,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // ── STEP 4: Fallback — usa Claude na transcrição ──
       if (transcription && transcription.trim().length > 0) {
         const audioPrompt = `You are a fact-checker for AuthentiScan Pro. Analyze this audio transcription for misinformation. Return ONLY valid JSON:
 
@@ -246,7 +242,6 @@ Transcription: """${transcription.slice(0, 3000)}"""
         }
       }
 
-      // ── STEP 5: Fallback final ──
       return res.status(200).json({
         type: "warn",
         score: 45,
