@@ -301,6 +301,13 @@ const UpBanner = ({ msg }) => (
         }}
       >
         Upgrade to Pro
+      </div>
+      <div style={{ fontSize: 12, color: "#5a6475", lineHeight: 1.5 }}>
+        {" "}
+        {msg}
+      </div>
+    </div>
+    <button
       className="btn-p"
       onClick={() => window.open("https://www.authentiscanapp.com/", "_blank")}
       style={{
