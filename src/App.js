@@ -723,7 +723,7 @@ function Splash({ onLogin, onRegister, onGuest }) {
 /* ══════════════════════════════════════════
    LOGIN
 ══════════════════════════════════════════ */
-function LoginScreen({ onLogin, onGuest, goRegister }) {
+function LoginScreen({ onLogin, onGuest, goRegister, goForgot }) {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -880,6 +880,13 @@ function LoginScreen({ onLogin, onGuest, goRegister }) {
               <Ico d={P.danger} s={14} c="#ff3b5c" /> {error}
             </div>
           )}
+
+          {/* Forgot password */}
+          <div style={{ textAlign:"right", marginBottom:12, marginTop:-4 }}>
+            <span onClick={goForgot} style={{ fontSize:12, color:"#5a6475", cursor:"pointer", textDecoration:"underline", textDecorationColor:"rgba(90,100,117,0.3)" }}>
+              Forgot password?
+            </span>
+          </div>
 
           {/* Sign in button */}
           <button
@@ -2959,10 +2966,227 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
 }
 
 /* ══════════════════════════════════════════
+   FORGOT PASSWORD
+══════════════════════════════════════════ */
+function ForgotPasswordScreen({ goLogin }) {
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [focused, setFocused] = useState("");
+
+  const handle = async () => {
+    setError("");
+    if (!email) { setError("Please enter your email address."); return; }
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "?reset=true",
+      });
+      if (err) throw err;
+      setShowModal(true);
+    } catch (e) {
+      setError(e.message || "Failed to send reset email. Try again.");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:"#070a0f" }}>
+      <style>{`@keyframes lgSpin{to{transform:rotate(360deg)}}`}</style>
+
+      {/* Email sent modal */}
+      {showModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.75)", backdropFilter:"blur(8px)", zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", padding:"0 24px" }}>
+          <div style={{ background:"#0d1117", border:"1px solid rgba(200,255,0,0.25)", borderRadius:20, padding:"28px 24px", maxWidth:340, width:"100%", textAlign:"center", boxShadow:"0 0 40px rgba(200,255,0,0.08)" }}>
+            <div style={{ width:56, height:56, borderRadius:"50%", background:"rgba(200,255,0,0.1)", border:"1.5px solid rgba(200,255,0,0.3)", display:"flex", alignItems:"center", justifyContent:"center", margin:"0 auto 16px" }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#c8ff00" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+            </div>
+            <div style={{ fontSize:17, fontWeight:700, color:"#f0f4f8", marginBottom:8 }}>Check your email</div>
+            <div style={{ fontSize:13, color:"#8a9ab5", lineHeight:1.6, marginBottom:6 }}>We sent a password reset link to</div>
+            <div style={{ fontSize:13, fontWeight:600, color:"#c8ff00", marginBottom:16, wordBreak:"break-all" }}>{email}</div>
+            <div style={{ fontSize:12, color:"#5a6475", lineHeight:1.6, marginBottom:24 }}>Click the link in the email to reset your password.</div>
+            <button onClick={goLogin} style={{ width:"100%", padding:"13px 0", background:"#c8ff00", border:"none", borderRadius:12, fontSize:13, fontWeight:700, color:"#070a0f", cursor:"pointer" }}>
+              Back to Login
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:56, paddingBottom:24 }}>
+        <AppLogo size={44} glow={true} />
+        <div style={{ marginTop:10, fontSize:20, fontWeight:800, color:"#f0f4f8", letterSpacing:-0.8 }}>
+          Reset <span style={{ color:"#c8ff00" }}>Password</span>
+        </div>
+        <div style={{ marginTop:4, fontSize:12, color:"#5a6475" }}>
+          We'll send a reset link to your email
+        </div>
+      </div>
+
+      <div style={{ flex:1, padding:"0 22px 40px" }}>
+        <div style={{ background:"rgba(13,17,23,0.9)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"24px 20px" }}>
+
+          <div style={{ position:"relative", marginBottom:14 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.user} s={15} c={focused==="email" ? "#c8ff00" : "#5a6475"} />
+            </div>
+            <input
+              className="inp"
+              type="email"
+              placeholder="Your email address"
+              value={email}
+              onChange={e => { setEmail(e.target.value); setError(""); }}
+              onFocus={() => setFocused("email")}
+              onBlur={() => setFocused("")}
+              onKeyDown={e => e.key === "Enter" && handle()}
+              style={{ padding:"13px 13px 13px 40px", borderColor: focused==="email" ? "#c8ff00" : "rgba(255,255,255,0.09)" }}
+            />
+          </div>
+
+          {error && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,59,92,0.07)", border:"1px solid rgba(255,59,92,0.25)", borderRadius:10, padding:"9px 12px", marginBottom:12, fontSize:12, color:"#ff3b5c" }}>
+              <Ico d={P.danger} s={14} c="#ff3b5c" /> {error}
+            </div>
+          )}
+
+          <button className="btn-p" onClick={handle} disabled={loading}
+            style={{ width:"100%", padding:"14px 0", fontSize:13, borderRadius:12, marginBottom:12, boxShadow: loading ? "none" : "0 4px 20px rgba(200,255,0,0.25)" }}>
+            {loading ? (
+              <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:"50%", border:"2px solid rgba(0,0,0,0.2)", borderTopColor:"#070a0f", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />
+                Sending...
+              </span>
+            ) : "Send Reset Link"}
+          </button>
+
+          <button className="btn-g" onClick={goLogin}
+            style={{ width:"100%", padding:"13px 0", fontSize:12, borderRadius:12 }}>
+            ← Back to Login
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   RESET PASSWORD
+══════════════════════════════════════════ */
+function ResetPasswordScreen({ goLogin }) {
+  const [pass, setPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [showPass, setShowPass] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [focused, setFocused] = useState("");
+
+  const handle = async () => {
+    setError("");
+    if (!pass || !confirm) { setError("Please fill in all fields."); return; }
+    if (pass.length < 6) { setError("Password must be at least 6 characters."); return; }
+    if (pass !== confirm) { setError("Passwords do not match."); return; }
+    setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.updateUser({ password: pass });
+      if (err) throw err;
+      setSuccess(true);
+    } catch (e) {
+      setError(e.message || "Failed to update password. Try again.");
+    }
+    setLoading(false);
+  };
+
+  if (success) {
+    return (
+      <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", background:"#070a0f", padding:"0 24px", textAlign:"center" }}>
+        <div style={{ width:64, height:64, borderRadius:"50%", background:"rgba(0,230,118,0.1)", border:"1.5px solid rgba(0,230,118,0.3)", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:20 }}>
+          <Ico d={P.check} s={32} c="#00e676" />
+        </div>
+        <div style={{ fontSize:20, fontWeight:800, color:"#f0f4f8", marginBottom:8 }}>Password Updated!</div>
+        <div style={{ fontSize:13, color:"#5a6475", lineHeight:1.6, marginBottom:28 }}>Your password has been changed successfully.</div>
+        <button className="btn-p" onClick={goLogin}
+          style={{ padding:"14px 40px", fontSize:13, borderRadius:12, boxShadow:"0 4px 20px rgba(200,255,0,0.25)" }}>
+          Back to Login
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:"#070a0f" }}>
+      <style>{`@keyframes lgSpin{to{transform:rotate(360deg)}}`}</style>
+
+      <div style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:56, paddingBottom:24 }}>
+        <AppLogo size={44} glow={true} />
+        <div style={{ marginTop:10, fontSize:20, fontWeight:800, color:"#f0f4f8", letterSpacing:-0.8 }}>
+          New <span style={{ color:"#c8ff00" }}>Password</span>
+        </div>
+        <div style={{ marginTop:4, fontSize:12, color:"#5a6475" }}>
+          Choose a strong password
+        </div>
+      </div>
+
+      <div style={{ flex:1, padding:"0 22px 40px" }}>
+        <div style={{ background:"rgba(13,17,23,0.9)", border:"1px solid rgba(255,255,255,0.08)", borderRadius:20, padding:"24px 20px" }}>
+
+          {/* New password */}
+          <div style={{ position:"relative", marginBottom:10 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.lock} s={15} c={focused==="pass" ? "#c8ff00" : "#5a6475"} />
+            </div>
+            <input className="inp" type={showPass ? "text" : "password"} placeholder="New password (min. 6 chars)"
+              value={pass} onChange={e => { setPass(e.target.value); setError(""); }}
+              onFocus={() => setFocused("pass")} onBlur={() => setFocused("")}
+              style={{ padding:"13px 42px 13px 40px", borderColor: focused==="pass" ? "#c8ff00" : "rgba(255,255,255,0.09)" }} />
+            <button onClick={() => setShowPass(s => !s)} style={{ position:"absolute", right:12, top:"50%", transform:"translateY(-50%)", background:"none", border:"none", cursor:"pointer", padding:4, opacity:0.6 }}>
+              <Ico d={showPass ? P.eyeoff : P.eye} s={17} c="#5a6475" />
+            </button>
+          </div>
+
+          {/* Confirm password */}
+          <div style={{ position:"relative", marginBottom:14 }}>
+            <div style={{ position:"absolute", left:14, top:"50%", transform:"translateY(-50%)", zIndex:1 }}>
+              <Ico d={P.lock} s={15} c={focused==="confirm" ? "#c8ff00" : "#5a6475"} />
+            </div>
+            <input className="inp" type={showPass ? "text" : "password"} placeholder="Confirm new password"
+              value={confirm} onChange={e => { setConfirm(e.target.value); setError(""); }}
+              onFocus={() => setFocused("confirm")} onBlur={() => setFocused("")}
+              onKeyDown={e => e.key === "Enter" && handle()}
+              style={{ padding:"13px 13px 13px 40px", borderColor: focused==="confirm" ? "#c8ff00" : "rgba(255,255,255,0.09)" }} />
+          </div>
+
+          {error && (
+            <div style={{ display:"flex", alignItems:"center", gap:8, background:"rgba(255,59,92,0.07)", border:"1px solid rgba(255,59,92,0.25)", borderRadius:10, padding:"9px 12px", marginBottom:12, fontSize:12, color:"#ff3b5c" }}>
+              <Ico d={P.danger} s={14} c="#ff3b5c" /> {error}
+            </div>
+          )}
+
+          <button className="btn-p" onClick={handle} disabled={loading}
+            style={{ width:"100%", padding:"14px 0", fontSize:13, borderRadius:12, marginBottom:12, boxShadow: loading ? "none" : "0 4px 20px rgba(200,255,0,0.25)" }}>
+            {loading ? (
+              <span style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                <span style={{ width:10, height:10, borderRadius:"50%", border:"2px solid rgba(0,0,0,0.2)", borderTopColor:"#070a0f", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />
+                Updating...
+              </span>
+            ) : "Update Password"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    APP ROOT
 ══════════════════════════════════════════ */
 export default function App() {
-  const [screen, setScreen] = useState("splash");
+  const [screen, setScreen] = useState(
+    window.location.search.includes("reset=true") ? "reset" : "splash"
+  );
   const [loggedIn, setLoggedIn] = useState(false);
   const [supaUser, setSupaUser] = useState(null);
   const [result, setResult] = useState(null);
@@ -3091,6 +3315,7 @@ export default function App() {
             onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
             onGuest={async () => { await supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); setHistory([]); setScansUsed(0); go("scan"); }}
             goRegister={() => go("register")}
+            goForgot={() => go("forgot")}
           />
         )}
         {screen === "register" && (
@@ -3099,6 +3324,12 @@ export default function App() {
             onGuest={async () => { await supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); setHistory([]); setScansUsed(0); go("scan"); }}
             goLogin={() => go("login")}
           />
+        )}
+        {screen === "forgot" && (
+          <ForgotPasswordScreen goLogin={() => go("login")} />
+        )}
+        {screen === "reset" && (
+          <ResetPasswordScreen goLogin={() => go("login")} />
         )}
         {screen === "scan" && (
           <ScanScreen
