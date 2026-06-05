@@ -1432,7 +1432,18 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
           }, 400);
           return;
         }
-      } catch (e) {}
+      } catch (e) {
+        clearInterval(iv);
+        setStep(-1);
+        if (e?.name === "AbortError") {
+          setScanError("Request timed out. Audio analysis can take up to 20s — check your connection and try again.");
+        } else if (!navigator.onLine) {
+          setScanError("No internet connection. Please check your network and try again.");
+        } else {
+          setScanError("Audio analysis failed. Please try again.");
+        }
+        return;
+      }
       clearInterval(iv);
       setStep(-1);
       setScanError("Analysis failed. Please check your connection and try again.");
@@ -1466,7 +1477,23 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
         }, 400);
         return;
       }
-    } catch (e) {}
+      // Non-ok response
+      clearInterval(iv);
+      setStep(-1);
+      setScanError(`Server error (${res.status}). Please try again in a moment.`);
+      return;
+    } catch (e) {
+      clearInterval(iv);
+      setStep(-1);
+      if (e?.name === "AbortError") {
+        setScanError("Request timed out. This can happen with long articles — try a shorter excerpt or check your connection.");
+      } else if (!navigator.onLine) {
+        setScanError("No internet connection. Please check your network and try again.");
+      } else {
+        setScanError("Analysis failed. Please check your connection and try again.");
+      }
+      return;
+    }
     clearInterval(iv);
     setStep(-1);
     setScanError("Analysis failed. Please check your connection and try again.");
@@ -1983,9 +2010,6 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
         {scanError && (
           <div
             style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
               padding: "12px 16px",
               marginBottom: 14,
               borderRadius: 12,
@@ -1993,17 +2017,20 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
               border: "1px solid rgba(255,59,92,0.25)",
             }}
           >
-            <Ico d={P.danger} s={16} c="#ff3b5c" />
-            <span
-              style={{
-                fontSize: 13,
-                color: "#ff3b5c",
-                fontWeight: 500,
-                lineHeight: 1.4,
-              }}
-            >
-              {scanError}
-            </span>
+            <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom: scanError.includes("timed out") || scanError.includes("internet") || scanError.includes("failed") ? 10 : 0 }}>
+              <Ico d={P.danger} s={16} c="#ff3b5c" />
+              <span style={{ fontSize: 13, color: "#ff3b5c", fontWeight: 500, lineHeight: 1.4 }}>
+                {scanError}
+              </span>
+            </div>
+            {(scanError.includes("timed out") || scanError.includes("internet") || scanError.includes("failed") || scanError.includes("error")) && !scanError.includes("Upgrade") && (
+              <button
+                onClick={() => { setScanError(""); doScan(); }}
+                style={{ width:"100%", padding:"9px 0", background:"rgba(255,59,92,0.12)", border:"1px solid rgba(255,59,92,0.3)", borderRadius:8, color:"#ff3b5c", fontSize:12, fontWeight:600, cursor:"pointer", fontFamily:"var(--mono)", letterSpacing:1 }}
+              >
+                ↺ Try Again
+              </button>
+            )}
           </div>
         )}
 
