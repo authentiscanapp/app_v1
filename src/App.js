@@ -3181,6 +3181,95 @@ function ResetPasswordScreen({ goLogin }) {
 }
 
 /* ══════════════════════════════════════════
+   ONBOARDING
+══════════════════════════════════════════ */
+function OnboardingScreen({ onDone }) {
+  const [idx, setIdx] = useState(0);
+
+  const slides = [
+    {
+      icon: "🛡️",
+      title: "Welcome to Authentiscan Pro",
+      sub: "Your AI-powered shield against misinformation and voice fraud.",
+      color: "#c8ff00",
+    },
+    {
+      icon: "🔍",
+      title: "Scan Text & URLs",
+      sub: "Paste any article, social post, or URL. Our AI cross-references sources in real time.",
+      color: "#00d4ff",
+    },
+    {
+      icon: "🎙️",
+      title: "Detect AI Voice Fraud",
+      sub: "Upload or record audio. We analyze acoustic patterns to identify synthetic voices.",
+      color: "#c8ff00",
+    },
+    {
+      icon: "📊",
+      title: "Understand the Risk",
+      sub: "Get a clear risk score with signal-by-signal explanation — no guesswork.",
+      color: "#00d4ff",
+    },
+  ];
+
+  const slide = slides[idx];
+  const isLast = idx === slides.length - 1;
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"space-between", background:"#070a0f", padding:"60px 28px 48px", textAlign:"center" }}>
+      <style>{`
+        @keyframes obUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes obPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+        .ob-slide{animation:obUp .4s ease both}
+      `}</style>
+
+      {/* Skip */}
+      <div style={{ alignSelf:"flex-end", marginBottom:0 }}>
+        {!isLast && (
+          <span onClick={onDone} style={{ fontSize:13, color:"#5a6475", cursor:"pointer", fontFamily:"var(--mono)", letterSpacing:1 }}>
+            Skip
+          </span>
+        )}
+      </div>
+
+      {/* Slide content */}
+      <div key={idx} className="ob-slide" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:24 }}>
+        {/* Icon */}
+        <div style={{ width:100, height:100, borderRadius:"50%", background:`${slide.color}10`, border:`1.5px solid ${slide.color}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:44, animation:"obPulse 3s ease-in-out infinite" }}>
+          {slide.icon}
+        </div>
+
+        <div>
+          <h2 style={{ fontSize:24, fontWeight:800, color:"#f0f4f8", margin:"0 0 12px", letterSpacing:-0.8, lineHeight:1.2 }}>
+            {slide.title}
+          </h2>
+          <p style={{ fontSize:15, color:"#8a9ab5", lineHeight:1.7, margin:0, maxWidth:300 }}>
+            {slide.sub}
+          </p>
+        </div>
+      </div>
+
+      {/* Dots */}
+      <div style={{ display:"flex", gap:8, marginBottom:28 }}>
+        {slides.map((_, i) => (
+          <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 22 : 7, height:7, borderRadius:4, background: i === idx ? slide.color : "rgba(255,255,255,0.12)", transition:"all .3s", cursor:"pointer" }} />
+        ))}
+      </div>
+
+      {/* Button */}
+      <button
+        className="btn-p"
+        onClick={() => isLast ? onDone() : setIdx(i => i + 1)}
+        style={{ width:"100%", maxWidth:340, padding:"16px 0", fontSize:14, borderRadius:14, boxShadow:`0 4px 24px ${slide.color}30`, background: slide.color, transition:"background .3s, box-shadow .3s" }}
+      >
+        {isLast ? "Get Started" : "Next →"}
+      </button>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    APP ROOT
 ══════════════════════════════════════════ */
 export default function App() {
@@ -3192,6 +3281,7 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [scansUsed, setScansUsed] = useState(0);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const go = (s) => setScreen(s);
 
@@ -3303,6 +3393,12 @@ export default function App() {
           position: "relative",
         }}
       >
+        {/* Onboarding overlay — shown once after email registration */}
+        {showOnboarding && (
+          <div style={{ position:"fixed", inset:0, zIndex:9999, maxWidth:430, margin:"0 auto" }}>
+            <OnboardingScreen onDone={() => setShowOnboarding(false)} />
+          </div>
+        )}
         {screen === "splash" && (
           <Splash
             onLogin={() => go("login")}
@@ -3320,7 +3416,7 @@ export default function App() {
         )}
         {screen === "register" && (
           <RegisterScreen
-            onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); go("scan"); }}
+            onLogin={(user) => { setLoggedIn(true); if(user) setSupaUser(user); setShowOnboarding(true); go("scan"); }}
             onGuest={async () => { await supabase.auth.signOut(); setSupaUser(null); setLoggedIn(false); setHistory([]); setScansUsed(0); go("scan"); }}
             goLogin={() => go("login")}
           />
