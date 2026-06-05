@@ -3188,27 +3188,33 @@ function OnboardingScreen({ onDone }) {
 
   const slides = [
     {
-      icon: "🛡️",
+      type: "logo",
       title: "Welcome to Authentiscan Pro",
-      sub: "Your AI-powered shield against misinformation and voice fraud.",
+      sub: "Your AI-powered shield against misinformation, scams, and voice fraud.",
       color: "#c8ff00",
     },
     {
-      icon: "🔍",
+      type: "icon",
+      icon: P.url,
+      iconColor: "#00d4ff",
       title: "Scan Text & URLs",
-      sub: "Paste any article, social post, or URL. Our AI cross-references sources in real time.",
+      sub: "Paste any article, social post, or link. Our AI fact-checks sources in real time.",
       color: "#00d4ff",
     },
     {
-      icon: "🎙️",
+      type: "icon",
+      icon: P.micro,
+      iconColor: "#c8ff00",
       title: "Detect AI Voice Fraud",
-      sub: "Upload or record audio. We analyze acoustic patterns to identify synthetic voices.",
+      sub: "Record or upload audio. We detect synthetic voices with Resemble AI DETECT-3B.",
       color: "#c8ff00",
     },
     {
-      icon: "📊",
+      type: "icon",
+      icon: P.eye,
+      iconColor: "#00d4ff",
       title: "Understand the Risk",
-      sub: "Get a clear risk score with signal-by-signal explanation — no guesswork.",
+      sub: "Get a clear risk score with signal-by-signal breakdown — always know why.",
       color: "#00d4ff",
     },
   ];
@@ -3219,13 +3225,14 @@ function OnboardingScreen({ onDone }) {
   return (
     <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"space-between", background:"#070a0f", padding:"60px 28px 48px", textAlign:"center" }}>
       <style>{`
-        @keyframes obUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes obPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
-        .ob-slide{animation:obUp .4s ease both}
+        @keyframes obUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes obPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+        @keyframes obGlow{0%,100%{box-shadow:0 0 24px rgba(200,255,0,0.2)}50%{box-shadow:0 0 48px rgba(200,255,0,0.45)}}
+        .ob-slide{animation:obUp .38s ease both}
       `}</style>
 
       {/* Skip */}
-      <div style={{ alignSelf:"flex-end", marginBottom:0 }}>
+      <div style={{ alignSelf:"flex-end" }}>
         {!isLast && (
           <span onClick={onDone} style={{ fontSize:13, color:"#5a6475", cursor:"pointer", fontFamily:"var(--mono)", letterSpacing:1 }}>
             Skip
@@ -3234,17 +3241,32 @@ function OnboardingScreen({ onDone }) {
       </div>
 
       {/* Slide content */}
-      <div key={idx} className="ob-slide" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:24 }}>
-        {/* Icon */}
-        <div style={{ width:100, height:100, borderRadius:"50%", background:`${slide.color}10`, border:`1.5px solid ${slide.color}30`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:44, animation:"obPulse 3s ease-in-out infinite" }}>
-          {slide.icon}
-        </div>
+      <div key={idx} className="ob-slide" style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:28 }}>
+
+        {/* Icon / Logo */}
+        {slide.type === "logo" ? (
+          <div style={{ position:"relative", width:110, height:110, display:"flex", alignItems:"center", justifyContent:"center" }}>
+            {/* rings */}
+            {[0,1].map(i => (
+              <div key={i} style={{ position:"absolute", inset: i*12, borderRadius:"50%", border:"1px solid rgba(200,255,0,0.2)", animation:`obPulse ${3+i}s ease-in-out infinite`, animationDelay:`${i*0.5}s` }} />
+            ))}
+            <div style={{ width:84, height:84, borderRadius:"50%", background:"rgba(200,255,0,0.07)", border:"1.5px solid rgba(200,255,0,0.25)", display:"flex", alignItems:"center", justifyContent:"center", animation:"obGlow 3s ease-in-out infinite" }}>
+              <AppLogo size={58} glow={true} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ width:88, height:88, borderRadius:"50%", background:`${slide.color}10`, border:`1.5px solid ${slide.color}28`, display:"flex", alignItems:"center", justifyContent:"center", animation:"obPulse 3s ease-in-out infinite" }}>
+            <Ico d={slide.icon} s={36} c={slide.iconColor} />
+          </div>
+        )}
 
         <div>
-          <h2 style={{ fontSize:24, fontWeight:800, color:"#f0f4f8", margin:"0 0 12px", letterSpacing:-0.8, lineHeight:1.2 }}>
-            {slide.title}
+          <h2 style={{ fontSize:24, fontWeight:800, color:"#f0f4f8", margin:"0 0 14px", letterSpacing:-0.8, lineHeight:1.2 }}>
+            {slide.title.includes("Authentiscan") ? (
+              <>Welcome to<br /><span style={{ color:"#c8ff00" }}>Authentiscan Pro</span></>
+            ) : slide.title}
           </h2>
-          <p style={{ fontSize:15, color:"#8a9ab5", lineHeight:1.7, margin:0, maxWidth:300 }}>
+          <p style={{ fontSize:15, color:"#8a9ab5", lineHeight:1.75, margin:0, maxWidth:300 }}>
             {slide.sub}
           </p>
         </div>
@@ -3253,7 +3275,7 @@ function OnboardingScreen({ onDone }) {
       {/* Dots */}
       <div style={{ display:"flex", gap:8, marginBottom:28 }}>
         {slides.map((_, i) => (
-          <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 22 : 7, height:7, borderRadius:4, background: i === idx ? slide.color : "rgba(255,255,255,0.12)", transition:"all .3s", cursor:"pointer" }} />
+          <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 24 : 7, height:7, borderRadius:4, background: i === idx ? slide.color : "rgba(255,255,255,0.12)", transition:"all .3s", cursor:"pointer" }} />
         ))}
       </div>
 
@@ -3261,9 +3283,9 @@ function OnboardingScreen({ onDone }) {
       <button
         className="btn-p"
         onClick={() => isLast ? onDone() : setIdx(i => i + 1)}
-        style={{ width:"100%", maxWidth:340, padding:"16px 0", fontSize:14, borderRadius:14, boxShadow:`0 4px 24px ${slide.color}30`, background: slide.color, transition:"background .3s, box-shadow .3s" }}
+        style={{ width:"100%", maxWidth:340, padding:"16px 0", fontSize:14, fontWeight:700, borderRadius:14, background: slide.color, boxShadow:`0 4px 24px ${slide.color}35`, transition:"background .3s, box-shadow .3s" }}
       >
-        {isLast ? "Get Started" : "Next →"}
+        {isLast ? "Get Started →" : "Next →"}
       </button>
     </div>
   );
