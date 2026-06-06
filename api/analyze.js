@@ -214,7 +214,7 @@ Transcription: """${transcription.slice(0, 3000)}"""
         const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
-          body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1000, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: audioPrompt }] }),
+          body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 800, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: audioPrompt }] }),
         });
 
         if (response.ok) {
@@ -256,7 +256,7 @@ Transcription: """${transcription.slice(0, 3000)}"""
     return res.status(400).json({ error: "No content provided" });
   }
 
-  const systemPrompt = `You are an expert fact-checker for AuthentiScan Pro. You ALWAYS use web_search before making any assessment. This is mandatory — never skip it. Search for the domain reputation, credibility, and any known issues before evaluating. Your score must reflect what you actually find via web search, never guess.`;
+  const systemPrompt = `You are an expert fact-checker for AuthentiScan Pro. Use web_search only once to verify the domain or a key claim. Do not run multiple searches. Return concise JSON only.`;
 
   const prompt = `Analyze this content for misinformation, scams, and credibility risks. Use web_search first, then return ONLY valid JSON (no markdown, no explanation outside JSON):
 
@@ -288,7 +288,7 @@ Rules:
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
-      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 2000, system: systemPrompt, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 800, system: systemPrompt, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: prompt }] }),
     });
 
     if (!response.ok) {
