@@ -14,6 +14,8 @@ module.exports = async function handler(req, res) {
   const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY;
   const RESEMBLE_KEY = process.env.RESEMBLE_API_KEY;
 
+  console.log("ENV CHECK - GEMINI_API_KEY:", !!process.env.GEMINI_API_KEY, "GOOGLE_API_KEY:", !!process.env.GOOGLE_API_KEY);
+
   if (!GOOGLE_API_KEY) return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
