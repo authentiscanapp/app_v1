@@ -1140,7 +1140,9 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
     "Analyzing Patterns",
     "Generating Report",
   ];
-  const API_URL = "/api/analyze";
+  const API_URL = typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()
+  ? "https://app.authentiscanapp.com/api/analyze"
+  : "/api/analyze";
 
   useEffect(() => {
     fetch(API_URL, {
