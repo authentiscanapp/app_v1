@@ -14,8 +14,6 @@ module.exports = async function handler(req, res) {
   const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY;
   const RESEMBLE_KEY = process.env.RESEMBLE_API_KEY;
 
-  console.log("ENV CHECK - GEMINI_API_KEY:", !!process.env.GEMINI_API_KEY, "GOOGLE_API_KEY:", !!process.env.GOOGLE_API_KEY);
-
   if (!GOOGLE_API_KEY) return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -86,32 +84,28 @@ module.exports = async function handler(req, res) {
       tools: [{ google_search: {} }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 800,
+        maxOutputTokens: 2048,
+        responseMimeType: "application/json",
       },
     };
 
-    console.log("Calling Gemini API...");
-    const res = await fetch(url, {
+    const fetchRes = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
-    console.log("Gemini response status:", res.status);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.log("Gemini error:", JSON.stringify(err));
-      throw new Error(err.error?.message || `Gemini API error ${res.status}`);
+    if (!fetchRes.ok) {
+      const err = await fetchRes.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini API error ${fetchRes.status}`);
     }
 
-    const data = await res.json();
+    const data = await fetchRes.json();
     const text = data.candidates?.[0]?.content?.parts
       ?.filter(p => p.text)
       ?.map(p => p.text)
       ?.join("") || "";
 
-    console.log("Gemini response length:", text.length);
-    console.log("Gemini raw response:", text);
     return text;
   }
 
