@@ -16,14 +16,12 @@ module.exports = async function handler(req, res) {
 
   if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
 
-  // ══════════════════════════════════════
-  // SCAN LIMIT CHECK
-  // ══════════════════════════════════════
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   const FREE_DAILY_LIMIT = 5;
 
   const userId = req.body?.userId || null;
+  const source = req.body?.source || "app";
 
   if (userId && SUPABASE_URL && SUPABASE_SERVICE_KEY) {
     try {
@@ -53,6 +51,34 @@ module.exports = async function handler(req, res) {
       }
     } catch (e) {
       console.warn("Limit check failed:", e.message);
+    }
+  }
+
+  // ── Helper: log scan to Supabase ──
+  async function logScan({ mode, url, score, type, verdict, title }) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return;
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/scan_logs`, {
+        method: "POST",
+        headers: {
+          "apikey": SUPABASE_SERVICE_KEY,
+          "Authorization": `Bearer ${SUPABASE_SERVICE_KEY}`,
+          "Content-Type": "application/json",
+          "Prefer": "return=minimal",
+        },
+        body: JSON.stringify({
+          mode,
+          source,
+          url: url ? url.slice(0, 500) : null,
+          score,
+          type,
+          verdict: verdict || null,
+          title: title ? title.slice(0, 200) : null,
+          user_id: userId || null,
+        }),
+      });
+    } catch (e) {
+      console.warn("logScan failed:", e.message);
     }
   }
 
@@ -143,12 +169,12 @@ module.exports = async function handler(req, res) {
         const isAI = resembleLabel === "fake" || resembleScore > 0.5;
         const type = aiPct >= 65 ? "danger" : aiPct >= 35 ? "warn" : "safe";
         const verdict = aiPct >= 65 ? "fake" : aiPct >= 35 ? "misleading" : "real";
+        const title = isAI ? "AI-Generated Voice Detected" : "Voice Appears Authentic";
+
+        await logScan({ mode: "audio", url: null, score: aiPct, type, verdict, title });
 
         return res.status(200).json({
-          type,
-          score: aiPct,
-          verdict,
-          title: isAI ? "AI-Generated Voice Detected" : "Voice Appears Authentic",
+          type, score: aiPct, verdict, title,
           desc: isAI
             ? `Resemble Detect identified synthetic voice characteristics with ${aiPct}% confidence.`
             : `Acoustic analysis found no significant evidence of artificial synthesis. ${100 - aiPct}% probability of being human.`,
@@ -157,38 +183,10 @@ module.exports = async function handler(req, res) {
             : `Audio appears to be of human origin (${100 - aiPct}% human).`,
           transcription: transcription ? transcription.slice(0, 300) : null,
           signals: [
-            {
-              name: "Voice Origin",
-              desc: isAI
-                ? `Resemble DETECT-3B identified synthetic voice patterns with ${aiPct}% probability.`
-                : `Acoustic patterns consistent with natural human voice (${aiPct}% AI probability).`,
-              pct: `${aiPct}%`,
-              level: type,
-            },
-            {
-              name: "Acoustic Analysis",
-              desc: `Resemble AI DETECT-3B analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} frame-by-frame.`,
-              pct: `${aiPct}%`,
-              level: type,
-            },
-            {
-              name: "Speech Transcription",
-              desc: transcription
-                ? `"${transcription.slice(0, 120)}"`
-                : transcriptionError
-                  ? `Transcription unavailable: ${transcriptionError}`
-                  : "Add ELEVENLABS_API_KEY to enable transcription.",
-              pct: transcription ? "OK" : "N/A",
-              level: transcription ? "safe" : "neutral",
-            },
-            {
-              name: "Content Analysis",
-              desc: transcription
-                ? "Transcription available. Use text mode to verify spoken claims."
-                : "Acoustic analysis complete. Transcription required to verify spoken content.",
-              pct: "N/A",
-              level: "neutral",
-            },
+            { name: "Voice Origin", desc: isAI ? `Resemble DETECT-3B identified synthetic voice patterns with ${aiPct}% probability.` : `Acoustic patterns consistent with natural human voice (${aiPct}% AI probability).`, pct: `${aiPct}%`, level: type },
+            { name: "Acoustic Analysis", desc: `Resemble AI DETECT-3B analyzed ${isAI ? "neural synthesis artifacts" : "natural speech variations"} frame-by-frame.`, pct: `${aiPct}%`, level: type },
+            { name: "Speech Transcription", desc: transcription ? `"${transcription.slice(0, 120)}"` : transcriptionError ? `Transcription unavailable: ${transcriptionError}` : "Add ELEVENLABS_API_KEY to enable transcription.", pct: transcription ? "OK" : "N/A", level: transcription ? "safe" : "neutral" },
+            { name: "Content Analysis", desc: transcription ? "Transcription available. Use text mode to verify spoken claims." : "Acoustic analysis complete. Transcription required to verify spoken content.", pct: "N/A", level: "neutral" },
           ],
         });
       }
@@ -215,18 +213,8 @@ Transcription: """${transcription.slice(0, 3000)}"""
 
         const response = await fetch("https://api.anthropic.com/v1/messages", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": ANTHROPIC_KEY,
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "web-search-2025-03-05",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-5",
-            max_tokens: 1000,
-            tools: [{ type: "web_search_20250305", name: "web_search" }],
-            messages: [{ role: "user", content: audioPrompt }],
-          }),
+          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
+          body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 1000, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: audioPrompt }] }),
         });
 
         if (response.ok) {
@@ -237,19 +225,16 @@ Transcription: """${transcription.slice(0, 3000)}"""
           if (jsonMatch) {
             const analysis = JSON.parse(jsonMatch[0]);
             analysis.transcription = transcription.slice(0, 300);
+            await logScan({ mode: "audio", url: null, score: analysis.score, type: analysis.type, verdict: analysis.verdict, title: analysis.title });
             return res.status(200).json(analysis);
           }
         }
       }
 
       return res.status(200).json({
-        type: "warn",
-        score: 45,
-        verdict: "unverified",
+        type: "warn", score: 45, verdict: "unverified",
         title: "Configuration Incomplete",
-        desc: !RESEMBLE_KEY
-          ? "Add RESEMBLE_API_KEY and BLOB_READ_WRITE_TOKEN in Vercel to enable real acoustic AI voice detection."
-          : `Detection failed: ${resembleError || "Unknown error"}`,
+        desc: !RESEMBLE_KEY ? "Add RESEMBLE_API_KEY and BLOB_READ_WRITE_TOKEN in Vercel to enable real acoustic AI voice detection." : `Detection failed: ${resembleError || "Unknown error"}`,
         summary: "Configure environment variables for complete analysis.",
         signals: [
           { name: "Voice Origin", desc: RESEMBLE_KEY ? (resembleError || "Error") : "RESEMBLE_API_KEY required.", pct: "N/A", level: "warn" },
@@ -302,19 +287,8 @@ Rules:
   try {
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_KEY,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "web-search-2025-03-05",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 2000,
-        system: systemPrompt,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
-        messages: [{ role: "user", content: prompt }],
-      }),
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
+      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 2000, system: systemPrompt, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: prompt }] }),
     });
 
     if (!response.ok) {
@@ -328,7 +302,21 @@ Rules:
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
 
-    return res.status(200).json(JSON.parse(jsonMatch[0]));
+    const result = JSON.parse(jsonMatch[0]);
+
+    // Detect if input is a URL
+    const isUrl = text.trim().match(/^https?:\/\//i);
+    await logScan({
+      mode: isUrl ? "url" : "text",
+      url: isUrl ? text.trim().slice(0, 500) : null,
+      score: result.score,
+      type: result.type,
+      verdict: result.verdict,
+      title: result.title,
+    });
+
+    return res.status(200).json(result);
+
   } catch (err) {
     return res.status(500).json({
       error: err.message,
