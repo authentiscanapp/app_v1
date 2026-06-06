@@ -90,14 +90,17 @@ module.exports = async function handler(req, res) {
       },
     };
 
+    console.log("Calling Gemini API...");
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
 
+    console.log("Gemini response status:", res.status);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      console.log("Gemini error:", JSON.stringify(err));
       throw new Error(err.error?.message || `Gemini API error ${res.status}`);
     }
 
@@ -107,6 +110,7 @@ module.exports = async function handler(req, res) {
       ?.map(p => p.text)
       ?.join("") || "";
 
+    console.log("Gemini response length:", text.length);
     return text;
   }
 
