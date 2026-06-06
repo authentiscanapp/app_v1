@@ -111,6 +111,7 @@ module.exports = async function handler(req, res) {
       ?.join("") || "";
 
     console.log("Gemini response length:", text.length);
+    console.log("Gemini raw response:", text);
     return text;
   }
 
