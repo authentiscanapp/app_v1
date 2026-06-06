@@ -10,11 +10,11 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET") return res.status(200).json({ status: "ok", message: "AuthentiScan API running" });
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY;
+  const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
   const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY;
   const RESEMBLE_KEY = process.env.RESEMBLE_API_KEY;
 
-  if (!ANTHROPIC_KEY) return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured" });
+  if (!GOOGLE_API_KEY) return res.status(500).json({ error: "GOOGLE_API_KEY not configured" });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
@@ -42,11 +42,7 @@ module.exports = async function handler(req, res) {
         const todayCount = countHeader ? parseInt(countHeader.split("/")[1]) : 0;
 
         if (todayCount >= FREE_DAILY_LIMIT) {
-          return res.status(429).json({
-            error: "Daily scan limit reached",
-            limit: FREE_DAILY_LIMIT,
-            code: "LIMIT_REACHED",
-          });
+          return res.status(429).json({ error: "Daily scan limit reached", limit: FREE_DAILY_LIMIT, code: "LIMIT_REACHED" });
         }
       }
     } catch (e) {
@@ -67,11 +63,9 @@ module.exports = async function handler(req, res) {
           "Prefer": "return=minimal",
         },
         body: JSON.stringify({
-          mode,
-          source,
+          mode, source,
           url: url ? url.slice(0, 500) : null,
-          score,
-          type,
+          score, type,
           verdict: verdict || null,
           title: title ? title.slice(0, 200) : null,
           user_id: userId || null,
@@ -80,6 +74,38 @@ module.exports = async function handler(req, res) {
     } catch (e) {
       console.warn("logScan failed:", e.message);
     }
+  }
+
+  // ── Helper: call Gemini 2.5 Flash with Google Search ──
+  async function callGemini(prompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GOOGLE_API_KEY}`;
+    const body = {
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 800,
+      },
+    };
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `Gemini API error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const text = data.candidates?.[0]?.content?.parts
+      ?.filter(p => p.text)
+      ?.map(p => p.text)
+      ?.join("") || "";
+
+    return text;
   }
 
   const { text, audio, mode, audioMime, audioExt } = req.body || {};
@@ -100,20 +126,12 @@ module.exports = async function handler(req, res) {
 
       if (RESEMBLE_KEY) {
         try {
-          const blob = await put(
-            `audio-scan-${Date.now()}.${ext}`,
-            audioBuffer,
-            { access: "public", contentType: mime }
-          );
+          const blob = await put(`audio-scan-${Date.now()}.${ext}`, audioBuffer, { access: "public", contentType: mime });
           blobUrl = blob.url;
 
           const resembleRes = await fetch("https://app.resemble.ai/api/v2/detect", {
             method: "POST",
-            headers: {
-              "Authorization": `Bearer ${RESEMBLE_KEY}`,
-              "Content-Type": "application/json",
-              "Prefer": "wait",
-            },
+            headers: { "Authorization": `Bearer ${RESEMBLE_KEY}`, "Content-Type": "application/json", "Prefer": "wait" },
             body: JSON.stringify({ url: blobUrl }),
           });
 
@@ -178,9 +196,7 @@ module.exports = async function handler(req, res) {
           desc: isAI
             ? `Resemble Detect identified synthetic voice characteristics with ${aiPct}% confidence.`
             : `Acoustic analysis found no significant evidence of artificial synthesis. ${100 - aiPct}% probability of being human.`,
-          summary: isAI
-            ? `Audio has high probability of being AI-generated (${aiPct}%).`
-            : `Audio appears to be of human origin (${100 - aiPct}% human).`,
+          summary: isAI ? `Audio has high probability of being AI-generated (${aiPct}%).` : `Audio appears to be of human origin (${100 - aiPct}% human).`,
           transcription: transcription ? transcription.slice(0, 300) : null,
           signals: [
             { name: "Voice Origin", desc: isAI ? `Resemble DETECT-3B identified synthetic voice patterns with ${aiPct}% probability.` : `Acoustic patterns consistent with natural human voice (${aiPct}% AI probability).`, pct: `${aiPct}%`, level: type },
@@ -192,35 +208,16 @@ module.exports = async function handler(req, res) {
       }
 
       if (transcription && transcription.trim().length > 0) {
-        const audioPrompt = `You are a fact-checker for AuthentiScan Pro. Analyze this audio transcription for misinformation. Return ONLY valid JSON:
+        const audioPrompt = `You are a fact-checker for AuthentiScan Pro. Analyze this audio transcription for misinformation. Use Google Search to verify claims. Return ONLY valid JSON, no markdown:
 
 Transcription: """${transcription.slice(0, 3000)}"""
 
-{
-  "type": "warn",
-  "score": 50,
-  "title": "Audio Content Analysis",
-  "desc": "2-3 sentences about credibility.",
-  "verdict": "unverified",
-  "summary": "One sentence conclusion.",
-  "signals": [
-    {"name": "Voice Origin", "desc": "Acoustic analysis unavailable — RESEMBLE_API_KEY required", "pct": "N/A", "level": "warn"},
-    {"name": "Speech Transcription", "desc": "transcription excerpt here", "pct": "OK", "level": "safe"},
-    {"name": "Audio Integrity", "desc": "coherence evaluation", "pct": "50%", "level": "warn"},
-    {"name": "Content Analysis", "desc": "analysis of claims made", "pct": "60%", "level": "warn"}
-  ]
-}`;
+Return this exact JSON structure:
+{"type":"warn","score":50,"title":"Audio Content Analysis","desc":"2-3 sentences about credibility.","verdict":"unverified","summary":"One sentence conclusion.","signals":[{"name":"Voice Origin","desc":"Acoustic analysis unavailable","pct":"N/A","level":"warn"},{"name":"Speech Transcription","desc":"transcription excerpt","pct":"OK","level":"safe"},{"name":"Audio Integrity","desc":"coherence evaluation","pct":"50%","level":"warn"},{"name":"Content Analysis","desc":"analysis of claims","pct":"60%","level":"warn"}]}`;
 
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
-          body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 800, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: audioPrompt }] }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          const fullText = data.content.filter(b => b.type === "text").map(b => b.text).join("");
-          const clean = fullText.replace(/```json|```/g, "").trim();
+        try {
+          const rawText = await callGemini(audioPrompt);
+          const clean = rawText.replace(/```json|```/g, "").trim();
           const jsonMatch = clean.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const analysis = JSON.parse(jsonMatch[0]);
@@ -228,6 +225,8 @@ Transcription: """${transcription.slice(0, 3000)}"""
             await logScan({ mode: "audio", url: null, score: analysis.score, type: analysis.type, verdict: analysis.verdict, title: analysis.title });
             return res.status(200).json(analysis);
           }
+        } catch (e) {
+          console.warn("Gemini audio analysis failed:", e.message);
         }
       }
 
@@ -256,56 +255,29 @@ Transcription: """${transcription.slice(0, 3000)}"""
     return res.status(400).json({ error: "No content provided" });
   }
 
-  const systemPrompt = `You are an expert fact-checker for AuthentiScan Pro. Use web_search only once to verify the domain or a key claim. Do not run multiple searches. Return concise JSON only.`;
+  const prompt = `You are an expert fact-checker for AuthentiScan Pro. Use Google Search to verify the domain reputation or key claims, then return ONLY valid JSON (no markdown, no text outside JSON).
 
-  const prompt = `Analyze this content for misinformation, scams, and credibility risks. Use web_search first, then return ONLY valid JSON (no markdown, no explanation outside JSON):
+Content to analyze: """${text.slice(0, 3000)}"""
 
-Content: """${text.slice(0, 3000)}"""
-
-{
-  "type": "danger",
-  "score": 87,
-  "title": "High Misinformation Risk",
-  "desc": "2-3 sentence analysis based on what you found. If a URL, explain what the domain is and why it is risky or credible.",
-  "verdict": "fake",
-  "summary": "One sentence key finding.",
-  "signals": [
-    {"name": "Claim Accuracy", "desc": "specific finding about claims", "pct": "15%", "level": "danger"},
-    {"name": "Source Credibility", "desc": "what you found about this domain/source", "pct": "5%", "level": "danger"},
-    {"name": "Emotional Intensity", "desc": "language tone analysis", "pct": "20%", "level": "danger"},
-    {"name": "Context Completeness", "desc": "context analysis", "pct": "25%", "level": "warn"}
-  ]
-}
+Return this exact JSON structure:
+{"type":"danger","score":87,"title":"High Misinformation Risk","desc":"2-3 sentence analysis. If a URL, explain what the domain is and why it is risky or credible.","verdict":"fake","summary":"One sentence key finding.","signals":[{"name":"Claim Accuracy","desc":"specific finding about claims","pct":"15%","level":"danger"},{"name":"Source Credibility","desc":"what you found about this domain/source","pct":"5%","level":"danger"},{"name":"Emotional Intensity","desc":"language tone analysis","pct":"20%","level":"danger"},{"name":"Context Completeness","desc":"context analysis","pct":"25%","level":"warn"}]}
 
 Rules:
 - type: "danger" if score 65-100, "warn" if 35-64, "safe" if 0-34
 - verdict: "fake", "misleading", "real", or "unverified"
 - Source Credibility pct MUST be "N/A" if no URL in content
-- Be specific — mention the actual domain name and what you found about it
-- Score must reflect what you actually found via web search — do not guess`;
+- Be specific — mention the actual domain name and what you found
+- Score must reflect what you actually found via search`;
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_KEY, "anthropic-version": "2023-06-01", "anthropic-beta": "web-search-2025-03-05" },
-      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 800, system: systemPrompt, tools: [{ type: "web_search_20250305", name: "web_search" }], messages: [{ role: "user", content: prompt }] }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error?.message || `API error ${response.status}`);
-    }
-
-    const data = await response.json();
-    const fullText = data.content.filter(b => b.type === "text").map(b => b.text).join("");
-    const clean = fullText.replace(/```json|```/g, "").trim();
+    const rawText = await callGemini(prompt);
+    const clean = rawText.replace(/```json|```/g, "").trim();
     const jsonMatch = clean.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
 
     const result = JSON.parse(jsonMatch[0]);
-
-    // Detect if input is a URL
     const isUrl = text.trim().match(/^https?:\/\//i);
+
     await logScan({
       mode: isUrl ? "url" : "text",
       url: isUrl ? text.trim().slice(0, 500) : null,
@@ -320,7 +292,7 @@ Rules:
   } catch (err) {
     return res.status(500).json({
       error: err.message,
-      detail: "Check ANTHROPIC_API_KEY in Vercel environment variables",
+      detail: "Check GOOGLE_API_KEY in Vercel environment variables",
     });
   }
 }
