@@ -10,11 +10,11 @@ module.exports = async function handler(req, res) {
   if (req.method === "GET") return res.status(200).json({ status: "ok", message: "AuthentiScan API running" });
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
-  const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+  const GOOGLE_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   const ELEVENLABS_KEY = process.env.ELEVENLABS_API_KEY;
   const RESEMBLE_KEY = process.env.RESEMBLE_API_KEY;
 
-  if (!GOOGLE_API_KEY) return res.status(500).json({ error: "GOOGLE_API_KEY not configured" });
+  if (!GOOGLE_API_KEY) return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
 
   const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
