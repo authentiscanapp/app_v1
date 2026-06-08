@@ -35,3 +35,6 @@ yarn-error.log*
 /android/app/release
 *.keystore
 !debug.keystore
+# release signing secrets — NEVER commit
+*.jks
+keystore.properties
