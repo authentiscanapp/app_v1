@@ -49,6 +49,7 @@ const P = {
   upload: "M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z",
   url: "M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z",
   check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  crown: "M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm0 3h14v-2H5v2z",
 };
 
 const stripCites = (text) => {
@@ -194,7 +195,7 @@ const Nav = ({ right, onBack }) => (
   </div>
 );
 
-const BNav = ({ active, go, user }) => {
+const BNav = ({ active, go, user, isPro }) => {
   const tabs = [
     { id: "scan", label: "Scan", d: P.scan },
     { id: "result", label: "Result", d: P.result },
@@ -248,13 +249,20 @@ const BNav = ({ active, go, user }) => {
             }}
           >
             {isProfile && user ? (
-              avatar ? (
-                <img src={avatar} alt="" style={{ width:22, height:22, borderRadius:"50%", objectFit:"cover", border: on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)" }} />
-              ) : (
-                <div style={{ width:22, height:22, borderRadius:"50%", background: on ? "rgba(200,255,0,0.2)" : "rgba(255,255,255,0.1)", border: on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color: on ? "#c8ff00" : "#f0f4f8" }}>
-                  {initials}
-                </div>
-              )
+              <div style={{ position: "relative", display: "flex" }}>
+                {avatar ? (
+                  <img src={avatar} alt="" style={{ width:22, height:22, borderRadius:"50%", objectFit:"cover", border: isPro ? "1.5px solid #ffd700" : on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", boxShadow: isPro ? "0 0 8px rgba(255,215,0,0.5)" : "none" }} />
+                ) : (
+                  <div style={{ width:22, height:22, borderRadius:"50%", background: isPro ? "rgba(255,215,0,0.18)" : on ? "rgba(200,255,0,0.2)" : "rgba(255,255,255,0.1)", border: isPro ? "1.5px solid #ffd700" : on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", boxShadow: isPro ? "0 0 8px rgba(255,215,0,0.5)" : "none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color: isPro ? "#ffd700" : on ? "#c8ff00" : "#f0f4f8" }}>
+                    {initials}
+                  </div>
+                )}
+                {isPro && (
+                  <div style={{ position:"absolute", top:-7, right:-6 }}>
+                    <Ico d={P.crown} s={11} c="#ffd700" />
+                  </div>
+                )}
+              </div>
             ) : (
               <Ico d={t.d} s={19} c={on ? "#c8ff00" : "#5a6475"} />
             )}
@@ -1114,7 +1122,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
 /* ══════════════════════════════════════════
    SCAN
 ══════════════════════════════════════════ */
-function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
+function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro }) {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
@@ -1133,6 +1141,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
   const mediaRef = useRef(null);
   const fileRef = useRef(null);
   const MAX_SCANS = 5;
+  const limitReached = !isPro && scansUsed >= MAX_SCANS;
 
   const STEPS = [
     "Parsing Content",
@@ -1376,13 +1385,13 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
       hour: "2-digit",
       minute: "2-digit",
     });
-    setScansUsed((n) => Math.min(n + 1, MAX_SCANS));
+    setScansUsed((n) => (isPro ? n + 1 : Math.min(n + 1, MAX_SCANS)));
     setResult({ ...analysis, input: inputVal, scanId, timestamp });
     go("result");
   };
 
   const runAnalysis = async (inputType, inputVal) => {
-    if (scansUsed >= MAX_SCANS) {
+    if (limitReached) {
       alert("Daily limit reached (5/5). Upgrade for unlimited scans.");
       return;
     }
@@ -1705,7 +1714,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
     >
       <Nav right="SCAN" />
       <div style={{ padding: "18px 20px 110px" }}>
-        {scansUsed >= MAX_SCANS && (
+        {limitReached && (
           <UpBanner msg="You've used all 5 free scans today." />
         )}
 
@@ -1719,39 +1728,67 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
           }}
         >
           <span className="label">Daily Scans</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {isPro ? (
             <div
               style={{
-                width: 100,
-                height: 4,
-                background: C.border,
-                borderRadius: 2,
-                overflow: "hidden",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "4px 12px",
+                borderRadius: 100,
+                background: "rgba(255,215,0,0.1)",
+                border: "1px solid rgba(255,215,0,0.35)",
               }}
             >
+              <Ico d={P.crown} s={13} c="#ffd700" />
+              <span
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 10,
+                  letterSpacing: 1.5,
+                  textTransform: "uppercase",
+                  fontWeight: 700,
+                  color: "#ffd700",
+                }}
+              >
+                Unlimited
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div
                 style={{
-                  height: "100%",
-                  width: `${pct}%`,
-                  background:
-                    pct >= 100 ? C.danger : pct >= 70 ? C.warn : C.accent,
+                  width: 100,
+                  height: 4,
+                  background: C.border,
                   borderRadius: 2,
-                  transition: "width .5s",
+                  overflow: "hidden",
                 }}
-              ></div>
+              >
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${pct}%`,
+                    background:
+                      pct >= 100 ? C.danger : pct >= 70 ? C.warn : C.accent,
+                    borderRadius: 2,
+                    transition: "width .5s",
+                  }}
+                ></div>
+              </div>
+              <span
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: 11,
+                  color: pct >= 100 ? C.danger : C.text,
+                  fontWeight: 600,
+                }}
+              >
+                {scansUsed}
+                <span style={{ color: C.muted }}>/{MAX_SCANS}</span>
+              </span>
             </div>
-            <span
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 11,
-                color: pct >= 100 ? C.danger : C.text,
-                fontWeight: 600,
-              }}
-            >
-              {scansUsed}
-              <span style={{ color: C.muted }}>/{MAX_SCANS}</span>
-            </span>
-          </div>
+          )}
         </div>
 
         {/* mode tabs */}
@@ -2036,7 +2073,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
 
         <button
           onClick={doScan}
-          disabled={scansUsed >= MAX_SCANS}
+          disabled={limitReached}
           className="btn-p"
           style={{
             width: "100%",
@@ -2048,21 +2085,16 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
-            boxShadow:
-              scansUsed >= MAX_SCANS
-                ? "none"
-                : "0 4px 24px rgba(200,255,0,0.25)",
+            boxShadow: limitReached
+              ? "none"
+              : "0 4px 24px rgba(200,255,0,0.25)",
           }}
         >
-          <Ico
-            d={P.scan}
-            s={18}
-            c={scansUsed >= MAX_SCANS ? "#5a6475" : "#070a0f"}
-          />
-          {scansUsed >= MAX_SCANS ? "Limit Reached — Upgrade" : "Scan Now"}
+          <Ico d={P.scan} s={18} c={limitReached ? "#5a6475" : "#070a0f"} />
+          {limitReached ? "Limit Reached — Upgrade" : "Scan Now"}
         </button>
       </div>
-      <BNav active="scan" go={go} user={supaUser} />
+      <BNav active="scan" go={go} user={supaUser} isPro={isPro} />
     </div>
   );
 }
@@ -2070,7 +2102,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser }) {
 /* ══════════════════════════════════════════
    RESULT
 ══════════════════════════════════════════ */
-function ResultScreen({ result, go, supaUser }) {
+function ResultScreen({ result, go, supaUser, isPro }) {
   const type = result?.type || "warn";
   const color =
     type === "danger" ? C.danger : type === "warn" ? C.warn : C.safe;
@@ -2614,7 +2646,7 @@ function ResultScreen({ result, go, supaUser }) {
           </button>
         </div>
       </div>
-      <BNav active="result" go={go} user={supaUser} />
+      <BNav active="result" go={go} user={supaUser} isPro={isPro} />
     </div>
   );
 }
@@ -2622,7 +2654,7 @@ function ResultScreen({ result, go, supaUser }) {
 /* ══════════════════════════════════════════
    HISTORY
 ══════════════════════════════════════════ */
-function HistoryScreen({ go, history, supaUser, onClearHistory }) {
+function HistoryScreen({ go, history, supaUser, onClearHistory, isPro }) {
   const icons = { danger: P.danger, warn: P.warn, safe: P.safe };
   const colors = { danger: C.danger, warn: C.warn, safe: C.safe };
   return (
@@ -2748,7 +2780,7 @@ function HistoryScreen({ go, history, supaUser, onClearHistory }) {
           </button>
         )}
       </div>
-      <BNav active="history" go={go} user={supaUser} />
+      <BNav active="history" go={go} user={supaUser} isPro={isPro} />
     </div>
   );
 }
@@ -2756,7 +2788,7 @@ function HistoryScreen({ go, history, supaUser, onClearHistory }) {
 /* ══════════════════════════════════════════
    PROFILE
 ══════════════════════════════════════════ */
-function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
+function ProfileScreen({ go, onLogout, scansUsed, history, supaUser, isPro }) {
   const user = supaUser;
   const name = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Guest";
   const email = user?.email || "guest@authentiscanapp.com";
@@ -2813,8 +2845,10 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
                   height: 68,
                   borderRadius: "50%",
                   objectFit: "cover",
-                  border: `2px solid ${C.accent}`,
-                  boxShadow: `0 0 16px rgba(200,255,0,0.2)`,
+                  border: isPro ? "2px solid #ffd700" : `2px solid ${C.accent}`,
+                  boxShadow: isPro
+                    ? "0 0 16px rgba(255,215,0,0.35)"
+                    : "0 0 16px rgba(200,255,0,0.2)",
                 }}
               />
             ) : (
@@ -2822,16 +2856,36 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
                 width: 68,
                 height: 68,
                 borderRadius: "50%",
-                background: "rgba(200,255,0,0.12)",
-                border: `2px solid ${C.accent}`,
+                background: isPro ? "rgba(255,215,0,0.14)" : "rgba(200,255,0,0.12)",
+                border: isPro ? "2px solid #ffd700" : `2px solid ${C.accent}`,
+                boxShadow: isPro ? "0 0 16px rgba(255,215,0,0.35)" : "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 22,
                 fontWeight: 800,
-                color: C.accent,
+                color: isPro ? "#ffd700" : C.accent,
               }}>
                 {initials}
+              </div>
+            )}
+            {isPro && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: -6,
+                  right: -6,
+                  width: 24,
+                  height: 24,
+                  borderRadius: "50%",
+                  background: "#070a0f",
+                  border: "2px solid #ffd700",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Ico d={P.crown} s={12} c="#ffd700" />
               </div>
             )}
             <div
@@ -2868,28 +2922,34 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
                 gap: 5,
                 padding: "3px 10px",
                 borderRadius: 100,
-                background: "rgba(200,255,0,0.08)",
-                border: "1px solid rgba(200,255,0,0.2)",
+                background: isPro ? "rgba(255,215,0,0.1)" : "rgba(200,255,0,0.08)",
+                border: isPro
+                  ? "1px solid rgba(255,215,0,0.35)"
+                  : "1px solid rgba(200,255,0,0.2)",
               }}
             >
-              <div
-                style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: "50%",
-                  background: C.accent,
-                }}
-              />
+              {isPro ? (
+                <Ico d={P.crown} s={10} c="#ffd700" />
+              ) : (
+                <div
+                  style={{
+                    width: 5,
+                    height: 5,
+                    borderRadius: "50%",
+                    background: C.accent,
+                  }}
+                />
+              )}
               <span
                 style={{
                   fontFamily: "var(--mono)",
                   fontSize: 8,
                   letterSpacing: 2,
                   textTransform: "uppercase",
-                  color: C.accent,
+                  color: isPro ? "#ffd700" : C.accent,
                 }}
               >
-                Free Plan
+                {isPro ? "Pro Plan" : "Free Plan"}
               </span>
             </div>
           </div>
@@ -2938,9 +2998,12 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
         {/* plan */}
         <div
           style={{
-            background:
-              "linear-gradient(135deg,rgba(200,255,0,0.06),rgba(0,212,255,0.04))",
-            border: "1px solid rgba(200,255,0,0.15)",
+            background: isPro
+              ? "linear-gradient(135deg,rgba(255,215,0,0.1),rgba(255,165,0,0.04))"
+              : "linear-gradient(135deg,rgba(200,255,0,0.06),rgba(0,212,255,0.04))",
+            border: isPro
+              ? "1px solid rgba(255,215,0,0.3)"
+              : "1px solid rgba(200,255,0,0.15)",
             borderRadius: 14,
             padding: "16px 18px",
             marginBottom: 14,
@@ -2954,10 +3017,23 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
               marginBottom: 6,
             }}
           >
-            <div style={{ fontWeight: 700, color: C.accent, fontSize: 14 }}>
-              Free Plan
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 700,
+                color: isPro ? "#ffd700" : C.accent,
+                fontSize: 14,
+              }}
+            >
+              {isPro && <Ico d={P.crown} s={15} c="#ffd700" />}
+              {isPro ? "Pro Plan" : "Free Plan"}
             </div>
-            <div className="label" style={{ color: C.accent2 }}>
+            <div
+              className="label"
+              style={{ color: isPro ? "#ffd700" : C.accent2 }}
+            >
               Active
             </div>
           </div>
@@ -2965,27 +3041,29 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
             style={{
               fontSize: 12,
               color: C.muted,
-              marginBottom: 12,
+              marginBottom: isPro ? 0 : 12,
               lineHeight: 1.6,
             }}
           >
-            {scansUsed}/5 scans used today
+            {isPro ? "Unlimited scans · thank you for being Pro" : `${scansUsed}/5 scans used today`}
           </div>
-          <button
-            className="btn-p"
-            onClick={() =>
-              window.open("https://www.authentiscanapp.com/", "_blank")
-            }
-            style={{
-              width: "100%",
-              padding: "12px 0",
-              fontSize: 13,
-              letterSpacing: 0.5,
-              borderRadius: 12,
-            }}
-          >
-            Upgrade to Pro
-          </button>
+          {!isPro && (
+            <button
+              className="btn-p"
+              onClick={() =>
+                window.open("https://www.authentiscanapp.com/", "_blank")
+              }
+              style={{
+                width: "100%",
+                padding: "12px 0",
+                fontSize: 13,
+                letterSpacing: 0.5,
+                borderRadius: 12,
+              }}
+            >
+              Upgrade to Pro
+            </button>
+          )}
         </div>
 
         {/* logout */}
@@ -3008,7 +3086,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser }) {
           Sign Out
         </button>
       </div>
-      <BNav active="profile" go={go} user={supaUser} />
+      <BNav active="profile" go={go} user={supaUser} isPro={isPro} />
     </div>
   );
 }
@@ -3351,6 +3429,7 @@ export default function App() {
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
   const [scansUsed, setScansUsed] = useState(0);
+  const [isPro, setIsPro] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const go = (s) => setScreen(s);
@@ -3387,8 +3466,16 @@ export default function App() {
     if (!supaUser) {
       setHistory([]);
       setScansUsed(0);
+      setIsPro(false);
       return;
     }
+    // Pro status — same source the backend uses to grant unlimited scans (profiles.is_pro)
+    supabase
+      .from("profiles")
+      .select("is_pro")
+      .eq("id", supaUser.id)
+      .maybeSingle()
+      .then(({ data }) => setIsPro(data?.is_pro === true));
     // Visible history: hide scans cleared by the user (data stays in the DB for reports)
     const clearedAt = supaUser.user_metadata?.history_cleared_at;
     let visibleQuery = supabase
@@ -3515,10 +3602,11 @@ export default function App() {
             scansUsed={scansUsed}
             setScansUsed={setScansUsed}
             supaUser={supaUser}
+            isPro={isPro}
           />
         )}
-        {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} />}
-        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} onClearHistory={async () => {
+        {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} isPro={isPro} />}
+        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} isPro={isPro} onClearHistory={async () => {
           const clearedAt = new Date().toISOString();
           if (supaUser) {
             const { data, error } = await supabase.auth.updateUser({ data: { history_cleared_at: clearedAt } });
@@ -3541,6 +3629,7 @@ export default function App() {
             scansUsed={scansUsed}
             history={history}
             supaUser={supaUser}
+            isPro={isPro}
           />
         )}
       </div>
