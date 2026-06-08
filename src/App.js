@@ -251,7 +251,7 @@ const BNav = ({ active, go, user, isPro }) => {
             {isProfile && user ? (
               <div style={{ position: "relative", display: "flex" }}>
                 {avatar ? (
-                  <img src={avatar} alt="" style={{ width:22, height:22, borderRadius:"50%", objectFit:"cover", border: isPro ? "1.5px solid #ffd700" : on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", boxShadow: isPro ? "0 0 8px rgba(255,215,0,0.5)" : "none" }} />
+                  <img src={avatar} alt="" referrerPolicy="no-referrer" style={{ width:22, height:22, borderRadius:"50%", objectFit:"cover", border: isPro ? "1.5px solid #ffd700" : on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", boxShadow: isPro ? "0 0 8px rgba(255,215,0,0.5)" : "none" }} />
                 ) : (
                   <div style={{ width:22, height:22, borderRadius:"50%", background: isPro ? "rgba(255,215,0,0.18)" : on ? "rgba(200,255,0,0.2)" : "rgba(255,255,255,0.1)", border: isPro ? "1.5px solid #ffd700" : on ? "1.5px solid #c8ff00" : "1.5px solid rgba(255,255,255,0.2)", boxShadow: isPro ? "0 0 8px rgba(255,215,0,0.5)" : "none", display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:700, color: isPro ? "#ffd700" : on ? "#c8ff00" : "#f0f4f8" }}>
                     {initials}
@@ -2841,6 +2841,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser, isPro }) {
               <img
                 src={avatar}
                 alt="Profile"
+                referrerPolicy="no-referrer"
                 style={{
                   width: 68,
                   height: 68,
@@ -3463,22 +3464,49 @@ export default function App() {
     // Native (Capacitor) OAuth: catch the deep-link callback and complete the
     // session. On web, detectSessionInUrl handles this automatically.
     let appListener;
+    let handledUrl = null;
+    const handleAuthDeepLink = async (url) => {
+      if (!url || !url.includes("login-callback") || url === handledUrl) return;
+      handledUrl = url;
+      try {
+        const u = new URL(url);
+        // Implicit flow: tokens come in the hash fragment.
+        const hashParams = new URLSearchParams(
+          u.hash?.startsWith("#") ? u.hash.slice(1) : ""
+        );
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        // PKCE flow: an auth code comes in the query string.
+        const code = u.searchParams.get("code");
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+        } else if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        } else {
+          console.warn("[oauth] no tokens in callback url");
+        }
+      } catch (e) {
+        console.warn("[oauth] callback failed:", e?.message);
+      }
+    };
     if (window?.Capacitor?.isNativePlatform?.()) {
-      import("@capacitor/app")
-        .then(({ App }) =>
-          App.addListener("appUrlOpen", async ({ url }) => {
-            if (!url || !url.includes("login-callback")) return;
-            try {
-              const code = new URL(url).searchParams.get("code");
-              if (code) await supabase.auth.exchangeCodeForSession(code);
-            } catch (e) {
-              console.warn("OAuth callback failed:", e?.message);
-            }
-          })
-        )
-        .then((handle) => {
-          appListener = handle;
-        });
+      import("@capacitor/app").then(async ({ App }) => {
+        // Cold start: the app process was killed and relaunched by the deep
+        // link, so appUrlOpen may have fired before this listener existed.
+        try {
+          const launch = await App.getLaunchUrl();
+          if (launch?.url) handleAuthDeepLink(launch.url);
+        } catch (e) {
+          console.warn("[oauth] getLaunchUrl failed:", e?.message);
+        }
+        // Warm start: future deep links while the app is alive.
+        appListener = await App.addListener("appUrlOpen", ({ url }) =>
+          handleAuthDeepLink(url)
+        );
+      });
     }
 
     return () => {
