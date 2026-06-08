@@ -2728,7 +2728,7 @@ function HistoryScreen({ go, history, supaUser, onClearHistory }) {
         )}
         {history.length > 0 && (
           <button
-            onClick={() => { if (window.confirm("Clear your scan history? Your scans stay saved, they just won't show here anymore.")) onClearHistory(); }}
+            onClick={() => { if (window.confirm("Clear your scan history?")) onClearHistory(); }}
             style={{
               width: "100%",
               padding: "12px 0",
