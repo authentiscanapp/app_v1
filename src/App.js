@@ -2728,7 +2728,7 @@ function HistoryScreen({ go, history, supaUser, onClearHistory }) {
         )}
         {history.length > 0 && (
           <button
-            onClick={onClearHistory}
+            onClick={() => { if (window.confirm("Clear your scan history? Your scans stay saved, they just won't show here anymore.")) onClearHistory(); }}
             style={{
               width: "100%",
               padding: "12px 0",
@@ -3389,10 +3389,14 @@ export default function App() {
       setScansUsed(0);
       return;
     }
-    supabase
+    // Visible history: hide scans cleared by the user (data stays in the DB for reports)
+    const clearedAt = supaUser.user_metadata?.history_cleared_at;
+    let visibleQuery = supabase
       .from("scans")
       .select("*")
-      .eq("user_id", supaUser.id)
+      .eq("user_id", supaUser.id);
+    if (clearedAt) visibleQuery = visibleQuery.gt("created_at", clearedAt);
+    visibleQuery
       .order("created_at", { ascending: false })
       .limit(50)
       .then(({ data, error }) => {
@@ -3410,10 +3414,17 @@ export default function App() {
             }),
           }))
         );
-        // Count only today's scans for the daily limit
-        const today = new Date().toISOString().slice(0, 10);
-        const todayScans = data.filter(r => r.created_at?.slice(0, 10) === today).length;
-        setScansUsed(todayScans);
+      });
+
+    // Daily limit: count ALL of today's scans, ignoring the clear filter so it can't be reset
+    const todayStart = new Date().toISOString().slice(0, 10) + "T00:00:00.000Z";
+    supabase
+      .from("scans")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", supaUser.id)
+      .gte("created_at", todayStart)
+      .then(({ count }) => {
+        if (typeof count === "number") setScansUsed(count);
       });
   }, [supaUser]);
 
@@ -3507,7 +3518,15 @@ export default function App() {
           />
         )}
         {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} />}
-        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} onClearHistory={() => setHistory([])} />}
+        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} onClearHistory={async () => {
+          const clearedAt = new Date().toISOString();
+          if (supaUser) {
+            const { data, error } = await supabase.auth.updateUser({ data: { history_cleared_at: clearedAt } });
+            if (error) { console.warn("Clear history failed:", error.message); return; }
+            if (data?.user) setSupaUser(data.user);
+          }
+          setHistory([]);
+        }} />}
         {screen === "profile" && (
           <ProfileScreen
             go={go}
