@@ -3486,7 +3486,7 @@ export default function App() {
           />
         )}
         {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} />}
-        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} />}
+        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} onClearHistory={async () => { if (supaUser) { await supabase.from("scan_logs").delete().eq("user_id", supaUser.id); } setHistory([]); }} />}
         {screen === "profile" && (
           <ProfileScreen
             go={go}
