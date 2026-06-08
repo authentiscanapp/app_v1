@@ -2622,7 +2622,7 @@ function ResultScreen({ result, go, supaUser }) {
 /* ══════════════════════════════════════════
    HISTORY
 ══════════════════════════════════════════ */
-function HistoryScreen({ go, history, supaUser }) {
+function HistoryScreen({ go, history, supaUser, onClearHistory }) {
   const icons = { danger: P.danger, warn: P.warn, safe: P.safe };
   const colors = { danger: C.danger, warn: C.warn, safe: C.safe };
   return (
@@ -2726,17 +2726,28 @@ function HistoryScreen({ go, history, supaUser }) {
             );
           })
         )}
-      </div>
         {history.length > 0 && (
-  <div style={{ padding: "0 20px 16px", position: "fixed", bottom: 70, left: 0, right: 0, zIndex: 10 }}>
-    <button
-      onClick={() => { if (window.confirm("Clear all scan history?")) onClearHistory(); }}
-      style={{ width: "100%", padding: "12px 0", background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.3)", borderRadius: 12, color: "#ff3b30", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}
-    >
-      Clear History
-    </button>
-  </div>
-)}
+          <button
+            onClick={onClearHistory}
+            style={{
+              width: "100%",
+              padding: "12px 0",
+              marginTop: 8,
+              background: "#ff3b30",
+              color: "#fff",
+              border: "none",
+              borderRadius: 14,
+              fontWeight: 700,
+              fontSize: 13,
+              letterSpacing: 0.5,
+              cursor: "pointer",
+              boxShadow: "0 4px 24px rgba(255,59,48,0.25)",
+            }}
+          >
+            Clear History
+          </button>
+        )}
+      </div>
       <BNav active="history" go={go} user={supaUser} />
     </div>
   );
@@ -3496,7 +3507,7 @@ export default function App() {
           />
         )}
         {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} />}
-        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} onClearHistory={async () => { if (supaUser) { await supabase.from("scan_logs").delete().eq("user_id", supaUser.id); } setHistory([]); }} />}
+        {screen === "history" && <HistoryScreen go={go} history={history} supaUser={supaUser} onClearHistory={() => setHistory([])} />}
         {screen === "profile" && (
           <ProfileScreen
             go={go}
