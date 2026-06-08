@@ -1385,7 +1385,8 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro })
       hour: "2-digit",
       minute: "2-digit",
     });
-    setScansUsed((n) => (isPro ? n + 1 : Math.min(n + 1, MAX_SCANS)));
+    // Note: scansUsed is incremented in handleResult (App), which also inserts
+    // the scan row — keeping a single source avoids double-counting.
     setResult({ ...analysis, input: inputVal, scanId, timestamp });
     go("result");
   };
