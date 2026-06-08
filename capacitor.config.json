@@ -1,0 +1,8 @@
+{
+  "appId": "com.authentiscan.pro",
+  "appName": "AuthentiScan Pro",
+  "webDir": "build",
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -746,7 +746,7 @@ function LoginScreen({ onLogin, onGuest, goRegister, goForgot }) {
     try {
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: window?.Capacitor?.isNativePlatform?.() ? 'com.authentiscan.pro://login-callback' : window.location.origin },
       });
       if (err) throw err;
     } catch (e) {
@@ -952,7 +952,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
     try {
       const { error: err } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo: window.location.origin },
+        options: { redirectTo: window?.Capacitor?.isNativePlatform?.() ? 'com.authentiscan.pro://login-callback' : window.location.origin },
       });
       if (err) throw err;
     } catch (e) {
@@ -3459,7 +3459,32 @@ export default function App() {
         setLoggedIn(false);
       }
     });
-    return () => subscription.unsubscribe();
+
+    // Native (Capacitor) OAuth: catch the deep-link callback and complete the
+    // session. On web, detectSessionInUrl handles this automatically.
+    let appListener;
+    if (window?.Capacitor?.isNativePlatform?.()) {
+      import("@capacitor/app")
+        .then(({ App }) =>
+          App.addListener("appUrlOpen", async ({ url }) => {
+            if (!url || !url.includes("login-callback")) return;
+            try {
+              const code = new URL(url).searchParams.get("code");
+              if (code) await supabase.auth.exchangeCodeForSession(code);
+            } catch (e) {
+              console.warn("OAuth callback failed:", e?.message);
+            }
+          })
+        )
+        .then((handle) => {
+          appListener = handle;
+        });
+    }
+
+    return () => {
+      subscription.unsubscribe();
+      appListener?.remove?.();
+    };
   }, []);
 
   // Load history from Supabase on login
