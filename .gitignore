@@ -38,3 +38,6 @@ yarn-error.log*
 # release signing secrets — NEVER commit
 *.jks
 keystore.properties
+
+# store screenshots contain personal data — keep local
+store-assets/screenshots/
