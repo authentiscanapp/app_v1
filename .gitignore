@@ -1,1 +1,37 @@
+# dependencies
 node_modules
+/.pnp
+.pnp.js
+
+# production build
+/build
+
+# testing
+/coverage
+
+# misc
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# env / secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# editor
+.vscode
+.idea
+
+# capacitor / android build artifacts
+/android/build
+/android/app/build
+/android/.gradle
+/android/local.properties
+/android/app/release
+*.keystore
+!debug.keystore
