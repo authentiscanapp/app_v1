@@ -2727,6 +2727,16 @@ function HistoryScreen({ go, history, supaUser }) {
           })
         )}
       </div>
+        {history.length > 0 && (
+  <div style={{ padding: "0 20px 16px", position: "fixed", bottom: 70, left: 0, right: 0, zIndex: 10 }}>
+    <button
+      onClick={() => { if (window.confirm("Clear all scan history?")) onClearHistory(); }}
+      style={{ width: "100%", padding: "12px 0", background: "rgba(255,59,48,0.1)", border: "1px solid rgba(255,59,48,0.3)", borderRadius: 12, color: "#ff3b30", fontFamily: "var(--mono)", fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", cursor: "pointer" }}
+    >
+      Clear History
+    </button>
+  </div>
+)}
       <BNav active="history" go={go} user={supaUser} />
     </div>
   );
