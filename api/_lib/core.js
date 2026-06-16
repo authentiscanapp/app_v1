@@ -12,6 +12,25 @@
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const MODEL = "claude-sonnet-4-5";
 
+/** Remove web-search <cite> citation markers the model injects into text. */
+function stripTags(s) {
+  return typeof s === "string"
+    ? s.replace(/<\/?cite[^>]*>/gi, "").replace(/[ \t]{2,}/g, " ").trim()
+    : s;
+}
+
+/** Clean all human-facing text fields of a result object in place. */
+function sanitizeResult(r) {
+  if (!r || typeof r !== "object") return r;
+  r.title = stripTags(r.title);
+  r.desc = stripTags(r.desc);
+  r.summary = stripTags(r.summary);
+  if (Array.isArray(r.signals)) {
+    r.signals.forEach((s) => { if (s) s.desc = stripTags(s.desc); });
+  }
+  return r;
+}
+
 /**
  * Analyze a URL or free text for misinformation / scam / credibility risk.
  * @returns internal result object
@@ -76,7 +95,7 @@ Rules:
   const jsonMatch = clean.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("No JSON in model response");
 
-  return JSON.parse(jsonMatch[0]);
+  return sanitizeResult(JSON.parse(jsonMatch[0]));
 }
 
 /**
@@ -230,7 +249,7 @@ Transcription: """${transcription.slice(0, 3000)}"""
       const clean = fullText.replace(/```json|```/g, "").trim();
       const jsonMatch = clean.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const analysis = JSON.parse(jsonMatch[0]);
+        const analysis = sanitizeResult(JSON.parse(jsonMatch[0]));
         analysis.transcription = transcription.slice(0, 300);
         return analysis;
       }
