@@ -43,3 +43,6 @@ keystore.properties
 store-assets/screenshots/
 store-assets/marketing/
 store-assets/REVIEWER_ACCOUNT.txt
+
+# API keys (plaintext) — NEVER commit
+API_KEYS.txt
