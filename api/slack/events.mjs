@@ -55,11 +55,11 @@ export default async function handler(req, res) {
     if (seen.size > 500) seen.clear();
   }
 
-  // 4) ACK immediately so Slack doesn't retry, then keep processing.
-  //    Vercel keeps the function alive until this handler's promise resolves,
-  //    so we can post the result asynchronously after responding.
-  res.status(200).json({ ok: true });
-
+  // 4) Process the event BEFORE responding.
+  //    On Vercel, code after the response is sent is not reliably executed
+  //    (the function can be frozen), so we must finish the work first.
+  //    Slack allows ~3s; if analysis is slower, Slack retries and we ignore
+  //    the retry above, so the first invocation still posts exactly once.
   try {
     if (body.type === "event_callback") {
       await handleEvent(body.event);
@@ -67,6 +67,8 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error("[events] processing error:", err);
   }
+
+  res.status(200).json({ ok: true });
 }
 
 async function handleEvent(event) {
