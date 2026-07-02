@@ -1,3 +1,4 @@
+import { waitUntil } from "@vercel/functions";
 import { getRawBody, verifySlackSignature } from "../../lib/verify.mjs";
 import { postMessage, downloadSlackFile, buildResultBlocks } from "../../lib/slack.mjs";
 import { analyzeUrl, analyzeAudio } from "../../lib/authentiscan.mjs";
@@ -55,20 +56,19 @@ export default async function handler(req, res) {
     if (seen.size > 500) seen.clear();
   }
 
-  // 4) Process the event BEFORE responding.
-  //    On Vercel, code after the response is sent is not reliably executed
-  //    (the function can be frozen), so we must finish the work first.
-  //    Slack allows ~3s; if analysis is slower, Slack retries and we ignore
-  //    the retry above, so the first invocation still posts exactly once.
-  try {
-    if (body.type === "event_callback") {
-      await handleEvent(body.event);
-    }
-  } catch (err) {
-    console.error("[events] processing error:", err);
-  }
-
+  // 4) ACK immediately so Slack doesn't time out or retry, then keep the
+  //    function alive with waitUntil() while we analyze and post the result.
+  //    (On Vercel, plain code after the response can be frozen; waitUntil
+  //    guarantees the async work runs to completion.)
   res.status(200).json({ ok: true });
+
+  if (body.type === "event_callback") {
+    waitUntil(
+      handleEvent(body.event).catch((err) =>
+        console.error("[events] processing error:", err)
+      )
+    );
+  }
 }
 
 async function handleEvent(event) {
@@ -111,30 +111,39 @@ async function handleEvent(event) {
     return;
   }
 
-  // --- Otherwise look for a URL in the text ---
-  const url = extractUrl(event.text || "");
-  if (!url) {
+  // --- Otherwise analyze the message text: a link if present, else plain text ---
+  const cleaned = stripMentions(event.text || "").trim();
+  if (cleaned.length < 4) {
     if (isMention) {
       await postMessage({
         channel,
         threadTs,
-        text: "Paste a link or attach an audio file and I'll analyze it. 🔎",
+        text: "Paste a link, some text, or attach an audio file and I'll analyze it. 🔎",
       });
     }
     return;
   }
 
+  const url = extractUrl(cleaned);
+  const kind = url ? "url" : "text";
+  const target = url || cleaned; // send just the URL, or the whole text
+
   try {
-    const result = await analyzeUrl(url);
+    const result = await analyzeUrl(target);
     await postMessage({
       channel,
       threadTs,
-      blocks: buildResultBlocks({ kind: "url", target: url, result }),
-      text: `AuthentiScan result for ${url}`,
+      blocks: buildResultBlocks({ kind, target, result }),
+      text: `AuthentiScan result for ${truncate(target, 80)}`,
     });
   } catch (err) {
     await postErr(channel, threadTs, err);
   }
+}
+
+// Remove Slack user mentions like <@U012ABC> or <@U012|name> from the text.
+function stripMentions(text) {
+  return text.replace(/<@[^>]+>/g, " ").replace(/\s{2,}/g, " ");
 }
 
 // Slack wraps links as <https://...|label>. Handle both wrapped and bare URLs.
@@ -143,6 +152,11 @@ function extractUrl(text) {
   if (wrapped) return wrapped[1];
   const bare = text.match(/https?:\/\/[^\s]+/i);
   return bare ? bare[0] : null;
+}
+
+function truncate(s, max) {
+  s = String(s);
+  return s.length > max ? s.slice(0, max - 1) + "…" : s;
 }
 
 async function postErr(channel, threadTs, err) {
