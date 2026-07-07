@@ -33,7 +33,7 @@
     LIME = "#C8FF00";
 
   var STYLES = [
-    ":host{all:initial}",
+    ":host{all:initial;display:block}",
     "*{box-sizing:border-box}",
     ".card{width:100%;max-width:320px;",
     "font-family:system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;",
