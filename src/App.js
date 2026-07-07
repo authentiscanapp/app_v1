@@ -1122,7 +1122,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
 /* ══════════════════════════════════════════
    SCAN
 ══════════════════════════════════════════ */
-function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro }) {
+function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro, initialUrl }) {
   const [mode, setMode] = useState("text");
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
@@ -1538,6 +1538,22 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro })
     }
     runAnalysis(mode, inp);
   };
+
+  // Deep-link: when the app is opened with ?url=<link> (e.g. the embeddable
+  // widget's "View full analysis" button), prefill URL mode and auto-run once.
+  const deepLinkRan = useRef(false);
+  useEffect(() => {
+    if (deepLinkRan.current || !initialUrl) return;
+    deepLinkRan.current = true;
+    setMode("url");
+    setUrl(initialUrl);
+    setScanError("");
+    // Clean the address bar so a refresh doesn't re-trigger the analysis.
+    try {
+      window.history.replaceState({}, "", window.location.pathname);
+    } catch {}
+    runAnalysis("url", initialUrl);
+  }, [initialUrl]);
 
   const chunksRef = useRef([]);
   const audioBlobRef = useRef(null);
@@ -3422,9 +3438,25 @@ function OnboardingScreen({ onDone }) {
 /* ══════════════════════════════════════════
    APP ROOT
 ══════════════════════════════════════════ */
+// Read a ?url=<link> deep-link from the address bar (e.g. from the embeddable
+// widget). Only accept http(s) URLs; ignore anything else.
+function getDeepLinkUrl() {
+  try {
+    const u = (new URLSearchParams(window.location.search).get("url") || "").trim();
+    return /^https?:\/\//i.test(u) ? u : "";
+  } catch {
+    return "";
+  }
+}
+
 export default function App() {
+  const deepLinkUrl = getDeepLinkUrl();
   const [screen, setScreen] = useState(
-    window.location.search.includes("reset=true") ? "reset" : "splash"
+    window.location.search.includes("reset=true")
+      ? "reset"
+      : deepLinkUrl
+      ? "scan"
+      : "splash"
   );
   const [loggedIn, setLoggedIn] = useState(false);
   const [supaUser, setSupaUser] = useState(null);
@@ -3657,6 +3689,7 @@ export default function App() {
             setScansUsed={setScansUsed}
             supaUser={supaUser}
             isPro={isPro}
+            initialUrl={deepLinkUrl}
           />
         )}
         {screen === "result" && <ResultScreen result={result} go={go} supaUser={supaUser} isPro={isPro} />}

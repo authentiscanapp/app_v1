@@ -24,6 +24,7 @@
   "use strict";
 
   var APP_URL = "https://app.authentiscanapp.com";
+  var API_BASE = APP_URL; // where /api/widget lives
 
   // Brand + state colors.
   var RED = "#FF4D4D",
@@ -64,6 +65,11 @@
     ".link:hover{filter:brightness(1.06)}",
     ".foot{display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;color:#7A7A7A}",
     ".foot svg{display:block;flex:0 0 auto}",
+    ".loading{display:flex;align-items:center;gap:9px;font-size:13px;color:#B9BBB4;padding:14px 0 16px}",
+    ".spinner{width:15px;height:15px;border-radius:50%;border:2px solid #2A2A2A;border-top-color:" + LIME + ";",
+    "animation:as-spin .7s linear infinite;flex:0 0 auto}",
+    "@keyframes as-spin{to{transform:rotate(360deg)}}",
+    ".err{font-size:12.5px;color:#FF7A7A;padding:12px 0 14px}",
   ].join("");
 
   var SHIELD =
@@ -138,27 +144,80 @@
     );
   }
 
-  function render(target, opts) {
-    var el = typeof target === "string" ? document.querySelector(target) : target;
-    if (!el) return null;
-    opts = opts || {};
+  function shellHtml(inner) {
+    return (
+      '<div class="card">' +
+      '<div class="head">' + SHIELD + '<span class="logo">AuthentiScan <b>Pro</b></span></div>' +
+      inner +
+      '<div class="foot">' + CHECK + "<span>Verified by AuthentiScan Pro</span></div>" +
+      "</div>"
+    );
+  }
 
+  var LOADING_HTML = shellHtml('<div class="loading"><span class="spinner"></span>Analyzing credibility…</div>');
+  var ERROR_HTML = shellHtml('<div class="err">Couldn\'t load the analysis right now.</div>');
+
+  function paint(el, inner) {
+    var root = el.shadowRoot || el.attachShadow({ mode: "open" });
+    root.innerHTML = "<style>" + STYLES + "</style>" + inner;
+  }
+
+  function hasScore(v) {
+    return v !== undefined && v !== null && v !== "" && !isNaN(parseFloat(v));
+  }
+
+  // Render the finished badge from a known score/signals.
+  function renderCard(el, opts) {
     var score = clamp(num(opts.score, 0));
     var verdict = opts.verdict
       ? { label: opts.verdict, color: verdictFor(score).color }
       : verdictFor(score);
-
     var signals = (Array.isArray(opts.signals) ? opts.signals : [])
       .slice(0, 3)
       .map(function (s) {
         return { label: s.label, value: s.value };
       });
-
     var link = APP_URL + "/?source=widget";
     if (opts.url) link += "&url=" + encodeURIComponent(opts.url);
+    paint(el, cardHtml(score, verdict, signals, link));
+  }
 
-    var root = el.shadowRoot || el.attachShadow({ mode: "open" });
-    root.innerHTML = "<style>" + STYLES + "</style>" + cardHtml(score, verdict, signals, link);
+  // Dynamic mode: only a URL is known. Fetch the authoritative score from the
+  // AuthentiScan API so the partner site can never supply (or fake) it.
+  function renderDynamic(el, url) {
+    paint(el, LOADING_HTML);
+    fetch(API_BASE + "/api/widget?url=" + encodeURIComponent(url))
+      .then(function (r) {
+        return r.json().catch(function () {
+          throw new Error("bad response");
+        });
+      })
+      .then(function (d) {
+        if (!d || d.error || typeof d.score !== "number") {
+          throw new Error(d && d.error ? d.error : "no score");
+        }
+        // Standardized short verdict from the score keeps the badge consistent.
+        renderCard(el, { score: d.score, signals: d.signals, url: url });
+      })
+      .catch(function (e) {
+        console.error("[AuthentiScan] widget fetch failed:", e);
+        paint(el, ERROR_HTML);
+      });
+  }
+
+  function render(target, opts) {
+    var el = typeof target === "string" ? document.querySelector(target) : target;
+    if (!el) return null;
+    opts = opts || {};
+
+    if (hasScore(opts.score)) {
+      renderCard(el, opts); // static: score supplied directly
+    } else if (opts.url) {
+      renderDynamic(el, String(opts.url).trim()); // dynamic: fetch the score
+    } else {
+      console.error("[AuthentiScan] widget needs a data-url (or data-score)");
+      return null;
+    }
     el.__asRendered = true;
     return el;
   }

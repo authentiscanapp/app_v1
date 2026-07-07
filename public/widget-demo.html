@@ -62,8 +62,23 @@
         <div id="widget-trustworthy"></div>
       </div>
 
-      <h2>How to use — declarative mode</h2>
-      <p>Include the script once and add a container with <code>data-*</code> attributes:</p>
+      <h2>Recommended — dynamic mode (score comes from AuthentiScan)</h2>
+      <p>
+        Pass <strong>only the URL</strong>. The widget fetches the authoritative
+        score from AuthentiScan on load — the partner site never supplies (and
+        can't fake) it. This is the integration you should ship.
+      </p>
+      <pre><code>&lt;div class="authentiscan-widget"
+     data-url="https://example.com/article"&gt;&lt;/div&gt;
+
+&lt;script src="https://app.authentiscanapp.com/widget.js" async&gt;&lt;/script&gt;</code></pre>
+
+      <h2>Static mode (preview / offline only)</h2>
+      <p>
+        If you already have a result and just want to render it (e.g. a design
+        preview), you can pass the values directly. Not for production trust
+        badges, since the score is client-controlled:
+      </p>
       <pre><code>&lt;div class="authentiscan-widget"
      data-score="92"
      data-signals='[{"label":"Source","value":90},{"label":"Language","value":74},{"label":"Images","value":58}]'

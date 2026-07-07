@@ -1,0 +1,181 @@
+<!doctype html>
+<!--
+  EXAMPLE: how a partner site (e.g. a news outlet) embeds the AuthentiScan Pro
+  widget inside one of their article pages. Everything here is the PARTNER's own
+  page — the only AuthentiScan parts are:
+    (1) the <div class="authentiscan-widget" ...> where they want the badge, and
+    (2) the <script src=".../widget.js"> near the end.
+  Search for "AUTHENTISCAN" below to see exactly what they'd paste.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>The Daily Ledger — Health officials respond to viral vaccine claim</title>
+    <style>
+      :root { --ink: #1a1a1a; --muted: #6b7280; --line: #e5e7eb; --brand: #b91c1c; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Georgia, "Times New Roman", serif;
+        color: var(--ink);
+        background: #fff;
+        line-height: 1.7;
+      }
+      .topbar {
+        border-bottom: 3px solid var(--brand);
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .masthead { font-weight: 700; font-size: 22px; letter-spacing: -0.5px; }
+      .masthead span { color: var(--brand); }
+      .nav { font-family: system-ui, sans-serif; font-size: 13px; color: var(--muted); }
+      .nav a { color: var(--muted); text-decoration: none; margin-left: 16px; }
+      .layout {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 32px 20px 64px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 40px;
+      }
+      @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+      .kicker {
+        font-family: system-ui, sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--brand);
+        margin-bottom: 10px;
+      }
+      h1 { font-size: 34px; line-height: 1.2; margin: 0 0 14px; }
+      .byline {
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        color: var(--muted);
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 16px;
+        margin-bottom: 22px;
+      }
+      .hero {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        background: linear-gradient(135deg, #cbd5e1, #94a3b8);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .caption { font-family: system-ui, sans-serif; font-size: 12px; color: var(--muted); margin-bottom: 24px; }
+      article p { font-size: 18px; margin: 0 0 20px; }
+      .sidebar { font-family: system-ui, sans-serif; }
+      .sidebar-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .sticky { position: sticky; top: 20px; }
+      .related {
+        margin-top: 28px;
+        border-top: 1px solid var(--line);
+        padding-top: 16px;
+        font-size: 14px;
+      }
+      .related a { color: var(--ink); text-decoration: none; display: block; margin-bottom: 12px; }
+      .related a:hover { color: var(--brand); }
+    </style>
+  </head>
+  <body>
+    <!-- ===== The partner's own site chrome ===== -->
+    <header class="topbar">
+      <div class="masthead">The Daily <span>Ledger</span></div>
+      <nav class="nav">
+        <a href="#">World</a><a href="#">Health</a><a href="#">Politics</a><a href="#">Tech</a>
+      </nav>
+    </header>
+
+    <div class="layout">
+      <!-- ===== The article (partner content) ===== -->
+      <main>
+        <div class="kicker">Health · Fact Check</div>
+        <h1>Health officials respond to viral claim that a new vaccine contains tracking microchips</h1>
+        <div class="byline">By Jane Coteau · Updated July 7, 2026 · 4 min read</div>
+
+        <div class="hero">[ Article image ]</div>
+        <div class="caption">A widely shared social post prompted responses from public health agencies this week.</div>
+
+        <article>
+          <p>
+            A claim circulating on social media this week alleged that a newly approved
+            vaccine contains microchips capable of tracking recipients. The post,
+            shared tens of thousands of times, offered no evidence and cited no
+            named sources.
+          </p>
+          <p>
+            Public health experts and independent fact-checkers have described the
+            claim as false. Vaccines do not contain microchips, tracking devices, or
+            any technology capable of transmitting a person's location, according to
+            multiple health agencies.
+          </p>
+          <p>
+            To help readers judge the credibility of the original post, our newsroom
+            ran it through an independent verification service. The result appears in
+            the panel on the right.
+          </p>
+          <p>
+            Officials reiterated that vaccine ingredients are publicly listed and
+            reviewed by regulators before approval, and encouraged the public to rely
+            on primary sources when evaluating health claims online.
+          </p>
+        </article>
+      </main>
+
+      <!-- ===== The sidebar, where the partner drops the widget ===== -->
+      <aside class="sidebar">
+        <div class="sticky">
+          <div class="sidebar-label">Credibility check</div>
+
+          <!-- ┌──────────────────────────────────────────────────────────┐
+               │  AUTHENTISCAN WIDGET — the ONLY thing a partner pastes     │
+               │  where they want the badge. Dynamic mode: they pass ONLY   │
+               │  the URL to verify; the score is fetched from AuthentiScan │
+               │  on load, so the partner can't supply or fake it.          │
+               │  In production, data-url is usually this article's own URL.│
+               └──────────────────────────────────────────────────────────┘ -->
+          <div
+            class="authentiscan-widget"
+            data-url="https://www.reuters.com"
+          ></div>
+          <!-- end AuthentiScan widget -->
+
+          <div class="related">
+            <div class="sidebar-label">More in Health</div>
+            <a href="#">What regulators actually review before approval</a>
+            <a href="#">How to spot a manipulated screenshot</a>
+            <a href="#">A short guide to reading primary sources</a>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ┌────────────────────────────────────────────────────────────────┐
+         │  AUTHENTISCAN SCRIPT — the partner includes this once per page,  │
+         │  usually right before </body>. It finds every                   │
+         │  .authentiscan-widget on the page and renders the badge.        │
+         │  In production the src is:                                      │
+         │    https://app.authentiscanapp.com/widget.js                    │
+         │  Here we use ./widget.js so the example works locally too.      │
+         └────────────────────────────────────────────────────────────────┘ -->
+    <script src="./widget.js" async></script>
+  </body>
+</html>
