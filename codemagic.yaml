@@ -1,0 +1,68 @@
+# Codemagic CI/CD — builds the AuthentiScan Pro iOS app in the cloud (no Mac needed).
+#
+# ── ONE-TIME SETUP IN THE CODEMAGIC UI (https://codemagic.io) ─────────────────
+# 1. Sign up and connect this GitHub repository (authentiscanapp/app_v1).
+# 2. Team → Integrations → App Store Connect: add an API key.
+#    - In App Store Connect (appstoreconnect.apple.com) → Users and Access → Integrations
+#      → App Store Connect API → generate a key (role: App Manager). Download the .p8,
+#      note the Key ID and Issuer ID. Paste all three into Codemagic.
+#    - Name the integration exactly "AuthentiScan App Store Connect" (used below),
+#      or rename it below to match.
+# 3. In App Store Connect, register the app once with bundle id: com.authentiscan.pro
+#    (My Apps → + → New App). This must exist before the first TestFlight upload.
+#
+# After that, every run of this workflow builds a signed .ipa and ships it to TestFlight.
+# ─────────────────────────────────────────────────────────────────────────────
+
+workflows:
+  ios-release:
+    name: AuthentiScan Pro — iOS
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: AuthentiScan App Store Connect
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.authentiscan.pro
+      vars:
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+        BUNDLE_ID: "com.authentiscan.pro"
+      node: 20
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Install npm dependencies
+        script: npm ci
+      - name: Build the web app (React → build/)
+        script: npm run build
+      - name: Sync web build + plugins into the iOS project
+        script: npx cap sync ios
+      - name: Set the build number (auto-incrementing)
+        script: |
+          cd ios/App
+          agvtool new-version -all "$BUILD_NUMBER"
+      - name: Apply the App Store provisioning profile
+        script: xcode-project use-profiles
+      - name: Build the signed .ipa
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        # Upload every successful build to TestFlight for beta testing.
+        submit_to_testflight: true
+        # To also submit for App Store review automatically, uncomment:
+        # submit_to_app_store: false
+      email:
+        recipients:
+          - ivanmorato@gmail.com
+        notify:
+          success: true
+          failure: true
