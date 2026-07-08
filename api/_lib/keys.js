@@ -51,7 +51,7 @@ async function authenticate(req, { supabaseUrl, serviceKey }) {
   let keyRow;
   try {
     const res = await fetch(
-      `${supabaseUrl}/rest/v1/api_keys?key_hash=eq.${hash}&select=id,label,plan,daily_limit,active&limit=1`,
+      `${supabaseUrl}/rest/v1/api_keys?key_hash=eq.${hash}&select=id,label,plan,daily_limit,active,total_requests&limit=1`,
       { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } }
     );
     const rows = await res.json();
@@ -102,20 +102,35 @@ async function authenticate(req, { supabaseUrl, serviceKey }) {
  */
 async function logRequest({ supabaseUrl, serviceKey, keyRow, mode, riskLevel, score }) {
   if (!supabaseUrl || !serviceKey || !keyRow) return;
+  const sbHeaders = {
+    apikey: serviceKey,
+    Authorization: `Bearer ${serviceKey}`,
+    "Content-Type": "application/json",
+    Prefer: "return=minimal",
+  };
   try {
+    // 1) Per-request row — this is what the daily quota is counted from.
     await fetch(`${supabaseUrl}/rest/v1/api_requests`, {
       method: "POST",
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-        Prefer: "return=minimal",
-      },
+      headers: sbHeaders,
       body: JSON.stringify({
         api_key_id: keyRow.id,
         mode: mode || null,
         risk_level: riskLevel || null,
         score: typeof score === "number" ? score : null,
+      }),
+    });
+  } catch (_) { /* best effort */ }
+  try {
+    // 2) Refresh the key's summary counters for the dashboard view.
+    //    Approximate under high concurrency (read-modify-write); fine for a
+    //    display column — the authoritative usage lives in api_requests.
+    await fetch(`${supabaseUrl}/rest/v1/api_keys?id=eq.${keyRow.id}`, {
+      method: "PATCH",
+      headers: sbHeaders,
+      body: JSON.stringify({
+        total_requests: (keyRow.total_requests || 0) + 1,
+        last_used_at: new Date().toISOString(),
       }),
     });
   } catch (_) { /* best effort */ }
