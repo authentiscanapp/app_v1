@@ -738,6 +738,7 @@ function LoginScreen({ onLogin, onGuest, goRegister, goForgot }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [focused, setFocused] = useState("");
 
   const handleGoogle = async () => {
@@ -752,6 +753,21 @@ function LoginScreen({ onLogin, onGuest, goRegister, goForgot }) {
     } catch (e) {
       setError("Google sign-in failed. Try email/password or guest mode.");
       setGoogleLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setError("");
+    setAppleLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: { redirectTo: window?.Capacitor?.isNativePlatform?.() ? 'com.authentiscan.pro://login-callback' : window.location.origin },
+      });
+      if (err) throw err;
+    } catch (e) {
+      setError("Apple sign-in failed. Try email/password or guest mode.");
+      setAppleLoading(false);
     }
   };
 
@@ -833,6 +849,36 @@ function LoginScreen({ onLogin, onGuest, goRegister, goForgot }) {
                   <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
                 </svg>
                 Continue with Google
+              </>
+            )}
+          </button>
+
+          {/* Apple button — required by App Store Guideline 4.8 alongside Google */}
+          <button
+            onClick={handleApple}
+            disabled={appleLoading}
+            style={{
+              width:"100%", padding:"14px 0", marginBottom:12,
+              background:"#000", border:"1px solid rgba(255,255,255,0.18)", borderRadius:12,
+              cursor: appleLoading ? "not-allowed" : "pointer",
+              display:"flex", alignItems:"center", justifyContent:"center", gap:10,
+              fontSize:14, fontWeight:600, color:"#fff",
+              boxShadow:"0 2px 12px rgba(0,0,0,0.3)",
+              opacity: appleLoading ? 0.8 : 1,
+              transition:"opacity .2s, transform .15s",
+            }}
+          >
+            {appleLoading ? (
+              <>
+                <span style={{ width:18, height:18, borderRadius:"50%", border:"2px solid #555", borderTopColor:"#fff", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />
+                Redirecting...
+              </>
+            ) : (
+              <>
+                <svg width="17" height="17" viewBox="0 0 384 512" fill="#fff">
+                  <path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/>
+                </svg>
+                Continue with Apple
               </>
             )}
           </button>
@@ -943,6 +989,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [focused, setFocused] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
@@ -958,6 +1005,21 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
     } catch (e) {
       setError("Google sign-up failed. Please try email.");
       setGoogleLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setError("");
+    setAppleLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithOAuth({
+        provider: "apple",
+        options: { redirectTo: window?.Capacitor?.isNativePlatform?.() ? 'com.authentiscan.pro://login-callback' : window.location.origin },
+      });
+      if (err) throw err;
+    } catch (e) {
+      setError("Apple sign-up failed. Please try email.");
+      setAppleLoading(false);
     }
   };
 
@@ -1102,6 +1164,12 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
           <button onClick={handleGoogle} disabled={googleLoading}
             style={{ width:"100%", padding:"13px 0", marginBottom:12, background: googleLoading ? "rgba(255,255,255,0.85)" : "#fff", border:"none", borderRadius:12, cursor: googleLoading ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontSize:13, fontWeight:600, color:"#1f1f1f", boxShadow:"0 2px 12px rgba(0,0,0,0.3)", opacity: googleLoading ? 0.8 : 1 }}>
             {googleLoading ? <><span style={{ width:16, height:16, borderRadius:"50%", border:"2px solid #ddd", borderTopColor:"#333", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />Redirecting...</> : <><svg width="16" height="16" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Continue with Google</>}
+          </button>
+
+          {/* Apple button — required by App Store Guideline 4.8 alongside Google */}
+          <button onClick={handleApple} disabled={appleLoading}
+            style={{ width:"100%", padding:"13px 0", marginBottom:12, background:"#000", border:"1px solid rgba(255,255,255,0.18)", borderRadius:12, cursor: appleLoading ? "not-allowed" : "pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:10, fontSize:13, fontWeight:600, color:"#fff", boxShadow:"0 2px 12px rgba(0,0,0,0.3)", opacity: appleLoading ? 0.8 : 1 }}>
+            {appleLoading ? <><span style={{ width:16, height:16, borderRadius:"50%", border:"2px solid #555", borderTopColor:"#fff", display:"inline-block", animation:"lgSpin .8s linear infinite" }} />Redirecting...</> : <><svg width="15" height="15" viewBox="0 0 384 512" fill="#fff"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>Continue with Apple</>}
           </button>
 
           {/* Guest */}
@@ -2813,6 +2881,32 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser, isPro }) {
   const initials = name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0,2) || "G";
 
   const [stats, setStats] = useState({ scans: 0, flags: 0, days: 0 });
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteErr, setDeleteErr] = useState("");
+
+  // Account deletion — required by App Store Guideline 5.1.1(v).
+  const handleDeleteAccount = async () => {
+    setDeleteErr("");
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("No active session. Please sign in again.");
+      const res = await fetch("/api/delete-account", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not delete account.");
+      // Wipe the local session and return to the start.
+      await supabase.auth.signOut();
+      onLogout();
+    } catch (e) {
+      setDeleteErr(e.message || "Could not delete account. Please try again.");
+      setDeleting(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -3103,7 +3197,90 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser, isPro }) {
         >
           Sign Out
         </button>
+
+        {/* Delete account — required by App Store Guideline 5.1.1(v).
+            Shown only for real (non-guest) accounts. */}
+        {user && (
+          <button
+            onClick={() => { setDeleteErr(""); setShowDelete(true); }}
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginTop: 10,
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              fontFamily: "var(--font)",
+              fontSize: 12,
+              fontWeight: 500,
+              textDecoration: "underline",
+              cursor: "pointer",
+            }}
+          >
+            Delete Account
+          </button>
+        )}
       </div>
+
+      {/* Delete confirmation modal */}
+      {showDelete && (
+        <div
+          onClick={() => !deleting && setShowDelete(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(0,0,0,0.72)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 360,
+              background: "#0d1117",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 18, padding: 24,
+            }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#fff", marginBottom: 8 }}>
+              Delete your account?
+            </div>
+            <div style={{ fontSize: 13, lineHeight: 1.5, color: "rgba(255,255,255,0.6)", marginBottom: 18 }}>
+              This permanently deletes your account and all your scan history.
+              This action cannot be undone.
+            </div>
+            {deleteErr && (
+              <div style={{ fontSize: 12, color: "#ff5c5c", marginBottom: 12 }}>{deleteErr}</div>
+            )}
+            <button
+              onClick={handleDeleteAccount}
+              disabled={deleting}
+              style={{
+                width: "100%", padding: "13px", marginBottom: 10,
+                background: deleting ? "rgba(255,59,92,0.5)" : "#ff3b5c",
+                border: "none", borderRadius: 12,
+                color: "#fff", fontFamily: "var(--font)", fontSize: 14, fontWeight: 600,
+                cursor: deleting ? "not-allowed" : "pointer",
+              }}
+            >
+              {deleting ? "Deleting…" : "Yes, delete my account"}
+            </button>
+            <button
+              onClick={() => !deleting && setShowDelete(false)}
+              disabled={deleting}
+              style={{
+                width: "100%", padding: "12px",
+                background: "transparent", border: "1px solid rgba(255,255,255,0.15)",
+                borderRadius: 12, color: "rgba(255,255,255,0.8)",
+                fontFamily: "var(--font)", fontSize: 13, fontWeight: 500,
+                cursor: deleting ? "not-allowed" : "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
       <BNav active="profile" go={go} user={supaUser} isPro={isPro} />
     </div>
   );
