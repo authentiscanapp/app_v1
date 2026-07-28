@@ -133,6 +133,7 @@ const Nav = ({ right, onBack }) => (
   <div
     style={{
       padding: "12px 20px",
+      paddingTop: "calc(12px + env(safe-area-inset-top))",
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
@@ -807,7 +808,7 @@ function LoginScreen({ onLogin, onGuest, goRegister, goForgot }) {
       `}</style>
 
       {/* Logo area */}
-      <div className="lg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:56, paddingBottom:24 }}>
+      <div className="lg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:"calc(56px + env(safe-area-inset-top))", paddingBottom:24 }}>
         <AppLogo size={52} glow={true} />
         <div style={{ marginTop:12, fontSize:22, fontWeight:800, color:"#f0f4f8", letterSpacing:-0.8 }}>
           Authentiscan <span style={{ color:"#c8ff00" }}>Pro</span>
@@ -1096,7 +1097,7 @@ function RegisterScreen({ onLogin, onGuest, goLogin }) {
         </div>
       )}
 
-      <div className="rg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:48, paddingBottom:20 }}>
+      <div className="rg1" style={{ display:"flex", flexDirection:"column", alignItems:"center", paddingTop:"calc(48px + env(safe-area-inset-top))", paddingBottom:20 }}>
         <AppLogo size={44} glow={true} />
         <div style={{ marginTop:10, fontSize:20, fontWeight:800, color:"#f0f4f8", letterSpacing:-0.8 }}>
           Hello! <span style={{ color:"#c8ff00" }}>Register</span> to get started
