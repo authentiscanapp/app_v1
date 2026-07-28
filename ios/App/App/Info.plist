@@ -45,6 +45,8 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>AuthentiScan Pro uses the microphone to record audio you choose to submit for authenticity analysis.</string>
 	<key>CFBundleURLTypes</key>
