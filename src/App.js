@@ -97,6 +97,7 @@ const GlobalStyles = () => (
       --accent:#c8ff00;
       --accent2:#00d4ff;
     }
+    html,body{margin:0;padding:0;width:100%;max-width:100%;overflow-x:hidden}
     body,#root{background:var(--bg);font-family:var(--font);color:#f0f4f8;-webkit-font-smoothing:antialiased}
     input,button,textarea,select{font-family:var(--font)}
     ::-webkit-scrollbar{width:3px}
