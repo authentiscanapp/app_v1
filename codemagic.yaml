@@ -23,6 +23,8 @@ workflows:
     integrations:
       app_store_connect: AuthentiScan App Store Connect
     environment:
+      groups:
+        - appstore_credentials
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"

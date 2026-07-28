@@ -46,3 +46,7 @@ store-assets/REVIEWER_ACCOUNT.txt
 
 # API keys (plaintext) — NEVER commit
 API_KEYS.txt
+
+# iOS distribution private key for Codemagic signing — NEVER commit
+ios_distribution_private_key
+ios_distribution_private_key.pub
