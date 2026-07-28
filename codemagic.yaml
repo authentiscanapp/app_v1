@@ -2,18 +2,19 @@
 #
 # ── ONE-TIME SETUP IN THE CODEMAGIC UI (https://codemagic.io) ─────────────────
 # 1. Sign up and connect this GitHub repository (authentiscanapp/app_v1).
-# 2. Team → Integrations → App Store Connect: add an API key.
+# 2. Settings → Integrations → Developer Portal: add an App Store Connect API key.
 #    - In App Store Connect (appstoreconnect.apple.com) → Users and Access → Integrations
 #      → App Store Connect API → generate a key (role: App Manager). Download the .p8,
 #      note the Key ID and Issuer ID. Paste all three into Codemagic.
-#    - Name the integration exactly "AuthentiScan App Store Connect" (used below),
+#    - Name the key exactly "AuthentiScan App Store Connect" (used below),
 #      or rename it below to match.
-# 3. In App Store Connect, register the app once with bundle id: com.authentiscan.pro
-#    (My Apps → + → New App). This must exist before the first TestFlight upload.
+# 3. Register the App ID com.authentiscan.pro at developer.apple.com → Identifiers.
+# 4. In App Store Connect, register the app once with bundle id: com.authentiscan.pro
+#    (Apps → + → New App). This must exist before the first TestFlight upload.
 #
-# After that, every run of this workflow builds a signed .ipa and ships it to TestFlight.
+# Code signing is fully automatic: the CLI creates the distribution certificate and
+# the provisioning profile on the first run and reuses them afterwards.
 # ─────────────────────────────────────────────────────────────────────────────
-
 workflows:
   ios-release:
     name: AuthentiScan Pro — iOS
@@ -22,9 +23,6 @@ workflows:
     integrations:
       app_store_connect: AuthentiScan App Store Connect
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.authentiscan.pro
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
@@ -43,8 +41,14 @@ workflows:
         script: |
           cd ios/App
           agvtool new-version -all "$BUILD_NUMBER"
-      - name: Apply the App Store provisioning profile
-        script: xcode-project use-profiles
+      - name: Set up code signing
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
       - name: Build the signed .ipa
         script: |
           xcode-project build-ipa \
