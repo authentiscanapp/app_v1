@@ -18,6 +18,11 @@
     "api/ping.js": {
       "memory": 128,
       "maxDuration": 5
+    },
+    "api/generate-image.js": {
+      "memory": 1024,
+      "maxDuration": 30,
+      "includeFiles": "api/fonts/**"
     }
   },
   "rewrites": [

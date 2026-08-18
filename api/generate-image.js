@@ -6,6 +6,37 @@
 // app.authentiscanapp.com). Route will be:
 //   https://app.authentiscanapp.com/api/generate-image
 
+// ---- Font setup for the serverless runtime ----
+// Vercel's Lambda ships no system fonts, so librsvg (used by sharp to
+// rasterize the SVG) renders text as empty boxes ("tofu"). We bundle the
+// fonts under api/fonts/ (kept in the deploy via `includeFiles` in
+// vercel.json) and point fontconfig at them. Its cache must live in /tmp,
+// the only writable path on Lambda. Must run before sharp renders any text.
+const path = require('path');
+const fs = require('fs');
+
+(function configureFonts() {
+  try {
+    const fontDir = path.join(__dirname, 'fonts');
+    const fcDir = '/tmp/fontconfig';
+    const fcCache = '/tmp/fontconfig-cache';
+    fs.mkdirSync(fcDir, { recursive: true });
+    fs.mkdirSync(fcCache, { recursive: true });
+    fs.writeFileSync(
+      path.join(fcDir, 'fonts.conf'),
+      `<?xml version="1.0"?>
+<fontconfig>
+  <dir>${fontDir}</dir>
+  <cachedir>${fcCache}</cachedir>
+</fontconfig>
+`
+    );
+    process.env.FONTCONFIG_PATH = fcDir;
+  } catch (err) {
+    console.error('font setup failed:', err);
+  }
+})();
+
 const sharp = require('sharp');
 
 // ---- Brand constants ----
