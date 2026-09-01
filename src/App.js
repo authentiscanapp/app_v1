@@ -1504,7 +1504,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro, i
         if (res.status === 429) {
           clearInterval(iv);
           setStep(-1);
-          setScanError(IS_IOS ? "You've reached your 5 free scans for today. Please try again tomorrow." : "You've reached your 5 free scans for today. Upgrade to Pro for unlimited scans.");
+          setScanError(IS_IOS ? "You've reached your daily limit of 5 scans. Please try again tomorrow." : "You've reached your 5 free scans for today. Upgrade to Pro for unlimited scans.");
           return;
         }
         if (res.ok) {
@@ -1549,7 +1549,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro, i
       if (res.status === 429) {
         clearInterval(iv);
         setStep(-1);
-        setScanError(IS_IOS ? "You've reached your 5 free scans for today. Please try again tomorrow." : "You've reached your 5 free scans for today. Upgrade to Pro for unlimited scans.");
+        setScanError(IS_IOS ? "You've reached your daily limit of 5 scans. Please try again tomorrow." : "You've reached your 5 free scans for today. Upgrade to Pro for unlimited scans.");
         return;
       }
       if (res.ok) {
@@ -3068,7 +3068,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser, isPro }) {
                   color: isPro ? "#ffd700" : C.accent,
                 }}
               >
-                {isPro ? "Pro Plan" : "Free Plan"}
+                {IS_IOS ? "Account" : isPro ? "Pro Plan" : "Free Plan"}
               </span>
             </div>
           </div>
@@ -3147,7 +3147,7 @@ function ProfileScreen({ go, onLogout, scansUsed, history, supaUser, isPro }) {
               }}
             >
               {isPro && <Ico d={P.crown} s={15} c="#ffd700" />}
-              {isPro ? "Pro Plan" : "Free Plan"}
+              {IS_IOS ? "Account" : isPro ? "Pro Plan" : "Free Plan"}
             </div>
             <div
               className="label"
@@ -3745,7 +3745,9 @@ export default function App() {
       .select("is_pro")
       .eq("id", supaUser.id)
       .maybeSingle()
-      .then(({ data }) => setIsPro(data?.is_pro === true));
+      // On iOS, Pro is intentionally ignored (no IAP yet, Guideline 3.1.1):
+      // the app never reflects an externally-purchased subscription there.
+      .then(({ data }) => setIsPro(data?.is_pro === true && !IS_IOS));
     // Visible history: hide scans cleared by the user (data stays in the DB for reports)
     const clearedAt = supaUser.user_metadata?.history_cleared_at;
     let visibleQuery = supabase
