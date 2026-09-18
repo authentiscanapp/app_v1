@@ -2192,7 +2192,7 @@ function ScanScreen({ go, setResult, scansUsed, setScansUsed, supaUser, isPro, i
           }}
         >
           <Ico d={P.scan} s={18} c={limitReached ? "#5a6475" : "#070a0f"} />
-          {limitReached ? "Limit Reached — Upgrade" : "Scan Now"}
+          {limitReached ? (IS_IOS ? "Daily Limit Reached" : "Limit Reached — Upgrade") : "Scan Now"}
         </button>
       </div>
       <BNav active="scan" go={go} user={supaUser} isPro={isPro} />
